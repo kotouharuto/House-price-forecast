@@ -1,0 +1,37 @@
+[project]
+name = "tokyo-rent-predictor"
+version = "0.1.0"
+description = "東京都賃貸物件の賃料予測モデル + Streamlitアプリ"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "requests",
+    "pandas",
+    "numpy",
+    "scikit-learn",
+    "lightgbm",
+    "xgboost",
+    "shap",
+    "matplotlib",
+    "seaborn",
+    "plotly",
+    "streamlit",
+    "jupyter",
+    "ipykernel",
+    "matplotlib-fontja"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "ruff",
+    "mypy",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# src/ ディレクトリ自体をパッケージとして配布する（src layoutではなくフラット同梱）
+[tool.hatch.build.targets.wheel]
+packages = ["src"]

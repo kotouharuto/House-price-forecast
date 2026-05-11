@@ -1,0 +1,71 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# テスト・カバレッジ
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# 型チェック
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+
+# Lint
+.ruff_cache/
+
+# データ・モデル（大きいためGit管理外）
+data/raw/
+data/processed/
+models/*.pkl
+models/*.joblib
+
+# 環境
+.venv/
+.uv/
+.env
+.env.local
+
+# ログ（中身は管理外、ディレクトリは .gitkeep で保持）
+logs/*.log
+logs/*.log.*
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
