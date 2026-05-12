@@ -2764,7 +2764,7 @@ dependencies = [
     { name = "xgboost" },
 ]
 
-[package.optional-dependencies]
+[package.dev-dependencies]
 dev = [
     { name = "mypy" },
     { name = "pytest" },
@@ -2778,20 +2778,23 @@ requires-dist = [
     { name = "lightgbm" },
     { name = "matplotlib" },
     { name = "matplotlib-fontja" },
-    { name = "mypy", marker = "extra == 'dev'" },
     { name = "numpy" },
     { name = "pandas" },
     { name = "plotly" },
-    { name = "pytest", marker = "extra == 'dev'" },
     { name = "requests" },
-    { name = "ruff", marker = "extra == 'dev'" },
     { name = "scikit-learn" },
     { name = "seaborn" },
     { name = "shap" },
     { name = "streamlit" },
     { name = "xgboost" },
 ]
-provides-extras = ["dev"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "mypy", specifier = ">=1.10" },
+    { name = "pytest", specifier = ">=8.0" },
+    { name = "ruff", specifier = ">=0.15.12" },
+]
 
 [[package]]
 name = "toml"

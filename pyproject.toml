@@ -21,13 +21,6 @@ dependencies = [
     "matplotlib-fontja"
 ]
 
-[project.optional-dependencies]
-dev = [
-    "pytest",
-    "ruff",
-    "mypy",
-]
-
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
@@ -35,3 +28,47 @@ build-backend = "hatchling.build"
 # src/ ディレクトリ自体をパッケージとして配布する（src layoutではなくフラット同梱）
 [tool.hatch.build.targets.wheel]
 packages = ["src"]
+
+# 開発用依存（PEP 735準拠の dependency-groups に一本化）
+[dependency-groups]
+dev = [
+    "ruff>=0.15.12",
+    "pytest>=8.0",
+    "mypy>=1.10",
+]
+
+# =============================================================================
+# Ruff 設定
+# =============================================================================
+[tool.ruff]
+# 行長の上限。データ分析プロジェクトでは長い列名・SQL等が多いため100を採用
+line-length = 100
+target-version = "py312"
+# notebooks は探索用なのでLint対象外、data/models/.venv は生成物
+exclude = ["notebooks", ".venv", "data", "models", "outputs"]
+
+[tool.ruff.lint]
+# 採用ルール
+select = [
+    "E",   # pycodestyle (PEP8 準拠)
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes (未使用import・未定義変数など)
+    "I",   # isort (import順序の自動整列)
+    "B",   # flake8-bugbear (バグになりやすいパターン)
+    "UP",  # pyupgrade (古い構文を新しい構文へ)
+    "N",   # pep8-naming (命名規則)
+    "SIM", # flake8-simplify (冗長な書き方を簡潔に)
+]
+ignore = [
+    "E501", # 行長は line-length で制御するため重複ルール無効化
+]
+
+[tool.ruff.lint.per-file-ignores]
+# テストは関数名規則(N802)を緩めにしてケース名を表現的に書けるようにする
+"tests/**/*.py" = ["N802"]
+# __init__.py は再エクスポート目的でのF401(未使用import)を許容
+"**/__init__.py" = ["F401"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

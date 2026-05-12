@@ -1,14 +1,7 @@
 """データ前処理および特徴量エンジニアリングを行うモジュール."""
 
-import os
-import sys
-import time
-
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
 import matplotlib_fontja  # noqa: F401
+import pandas as pd
 
 from utils.logger import get_logger
 
@@ -24,18 +17,26 @@ def load_data(file_path: str) -> pd.DataFrame:
 
     Returns:
         ロードしたデータフレーム。
+
+    Raises:
+        FileNotFoundError: 指定したCSVファイルが存在しない場合。
+        UnicodeDecodeError: CP932 でデコードできないバイトが含まれていた場合。
+        pd.errors.ParserError: CSVの構造が壊れていてパースに失敗した場合。
     """
     logger.info(f"Loading data from {file_path}...")
     try:
-        df = pd.read_csv(file_path, encoding='cp932')
+        df = pd.read_csv(file_path, encoding="cp932")
         logger.info(f"Data loaded successfully with shape {df.shape}.")
         return df
-    except Exception as e:
-        logger.error(f"Failed to load data: {e}")
+    except FileNotFoundError:
+        logger.error(f"File not found: {file_path}")
         raise
-
-
-import pandas as pd
+    except UnicodeDecodeError:
+        logger.error(f"Failed to decode {file_path} with cp932 encoding.")
+        raise
+    except pd.errors.ParserError:
+        logger.error(f"Failed to parse CSV file: {file_path}")
+        raise
 
 
 def infer_residential_usage(df: pd.DataFrame, score_threshold: int = 2) -> pd.DataFrame:
@@ -57,16 +58,16 @@ def infer_residential_usage(df: pd.DataFrame, score_threshold: int = 2) -> pd.Da
     result = df.copy()
 
     # 欠損行のマスク
-    mask_missing = result['用途'].isna()
+    mask_missing = result["用途"].isna()
 
     # 各住宅指標（True=住宅らしい）をベクトル化で算出
-    has_madori = result['間取り'].notna()
+    has_madori = result["間取り"].notna()
 
-    residential_structures = ['ＲＣ', 'ＳＲＣ', '木造', '鉄骨造', '軽量鉄骨造', 'ブロック造']
-    has_residential_structure = result['建物の構造'].isin(residential_structures)
+    residential_structures = ["ＲＣ", "ＳＲＣ", "木造", "鉄骨造", "軽量鉄骨造", "ブロック造"]
+    has_residential_structure = result["建物の構造"].isin(residential_structures)
 
-    residential_types = ['中古マンション等', '宅地(建物)']
-    has_residential_type = result['種類'].isin(residential_types)
+    residential_types = ["中古マンション等", "宅地(建物)"]
+    has_residential_type = result["種類"].isin(residential_types)
 
     # スコア合算
     score = (
@@ -78,18 +79,15 @@ def infer_residential_usage(df: pd.DataFrame, score_threshold: int = 2) -> pd.Da
 
     # 「欠損 かつ 住宅らしい」行だけを補完
     fill_mask = mask_missing & is_likely_residential
-    result.loc[fill_mask, '用途'] = '住宅'
+    result.loc[fill_mask, "用途"] = "住宅"
 
     # 補完結果のログ
     n_filled = int(fill_mask.sum())
     n_remaining = int(mask_missing.sum() - n_filled)
-    print(f'住宅と推定して補完: {n_filled:,} 件')
-    print(f'判定不能のため欠損のまま: {n_remaining:,} 件')
+    logger.info(f"用途を住宅と推定して補完: {n_filled:,} 件")
+    logger.info(f"用途の判定不能のため欠損のまま: {n_remaining:,} 件")
 
     return result
-
-
-import pandas as pd
 
 
 def fill_zoning_ratios(df: pd.DataFrame) -> pd.DataFrame:
@@ -107,15 +105,15 @@ def fill_zoning_ratios(df: pd.DataFrame) -> pd.DataFrame:
         建蔽率・容積率を補完した新しいDataFrame。
     """
     result = df.copy()
-    target_cols = ['建蔽率（％）', '容積率（％）']
+    target_cols = ["建蔽率（％）", "容積率（％）"]
 
     for col in target_cols:
         # 1. 地区名グループの最頻値で埋める
-        result[col] = result.groupby('地区名')[col].transform(
+        result[col] = result.groupby("地区名")[col].transform(
             lambda s: s.fillna(s.mode().iloc[0]) if not s.mode().empty else s
         )
         # 2. まだ欠損なら市区町村名グループの最頻値で埋める
-        result[col] = result.groupby('市区町村名')[col].transform(
+        result[col] = result.groupby("市区町村名")[col].transform(
             lambda s: s.fillna(s.mode().iloc[0]) if not s.mode().empty else s
         )
         # 3. それでも欠損なら全体の最頻値で埋める
@@ -123,7 +121,7 @@ def fill_zoning_ratios(df: pd.DataFrame) -> pd.DataFrame:
         result[col] = result[col].fillna(global_mode)
 
         n_remaining = int(result[col].isna().sum())
-        print(f'{col}: 補完後の欠損数 = {n_remaining:,}')
+        logger.info(f"{col}: 補完後の欠損数 = {n_remaining:,}")
 
     return result
 
@@ -142,89 +140,96 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
         クリーニング後のデータフレーム。
     """
     logger.info("Starting data cleaning...")
-    
+
     # 例: 不要な列 'ID' を削除
-    if 'ID' in df.columns:
-        df = df.drop(columns=['ID'])
+    if "ID" in df.columns:
+        df = df.drop(columns=["ID"])
         logger.info("Dropped column 'ID'.")
-    
+
     if "最寄駅：名称" in df.columns:
-        missing_station_count = df['最寄駅：名称'].isna().sum()
+        missing_station_count = df["最寄駅：名称"].isna().sum()
         logger.info(f"Found {missing_station_count} missing values in '最寄駅：名称' column.")
         # 欠損値を 'Unknown' で埋める
-        df['最寄駅：名称'] = df['最寄駅：名称'].fillna('Unknown')
+        df["最寄駅：名称"] = df["最寄駅：名称"].fillna("Unknown")
         logger.info("Filled missing values in '最寄駅：名称' with 'Unknown'.")
 
     if "最寄駅：距離（分）" in df.columns:
-        missing_distance_count = df['最寄駅：距離（分）'].isna().sum()
-        logger.info(f"Found {missing_distance_count} missing values in '最寄駅：距離（分）' column.")
+        missing_distance_count = df["最寄駅：距離（分）"].isna().sum()
+        logger.info(
+            f"Found {missing_distance_count} missing values in '最寄駅：距離（分）' column."
+        )
         # 欠損値を中央値で埋める
-        median_distance = df['最寄駅：距離（分）'].median()
-        df['最寄駅：距離（分）'] = df['最寄駅：距離（分）'].fillna(median_distance)
-        logger.info(f"Filled missing values in '最寄駅：距離（分）' with median value {median_distance}.")
-    
+        median_distance = df["最寄駅：距離（分）"].median()
+        df["最寄駅：距離（分）"] = df["最寄駅：距離（分）"].fillna(median_distance)
+        logger.info(
+            f"Filled missing values in '最寄駅：距離（分）' with median value {median_distance}."
+        )
+
     if "間取り" in df.columns:
-        missing_layout_count = df['間取り'].isna().sum()
+        missing_layout_count = df["間取り"].isna().sum()
         logger.info(f"Found {missing_layout_count} missing values in '間取り' column.")
         # 欠損値を 'Unknown' で埋める
-        df['間取り'] = df['間取り'].fillna('Unknown')
+        df["間取り"] = df["間取り"].fillna("Unknown")
         logger.info("Filled missing values in '間取り' with 'Unknown'.")
 
     if "築年数" in df.columns:
-        missing_age_count = df['築年数'].isna().sum()
+        missing_age_count = df["築年数"].isna().sum()
         logger.info(f"Found {missing_age_count} missing values in '築年数' column.")
         # 欠損値を中央値で埋める
-        median_age = df['築年数'].median()
-        df['築年数'] = df['築年数'].fillna(median_age)
+        median_age = df["築年数"].median()
+        df["築年数"] = df["築年数"].fillna(median_age)
         logger.info(f"Filled missing values in '築年数' with median value {median_age}.")
 
     if "建物の構造" in df.columns:
-        missing_structure_count = df['建物の構造'].isna().sum()
+        missing_structure_count = df["建物の構造"].isna().sum()
         logger.info(f"Found {missing_structure_count} missing values in '建物の構造' column.")
         # 欠損値を 'Unknown' で埋める
-        df['建物の構造'] = df['建物の構造'].fillna('Unknown')
+        df["建物の構造"] = df["建物の構造"].fillna("Unknown")
         logger.info("Filled missing values in '建物の構造' with 'Unknown'.")
 
     if "用途" in df.columns:
-        missing_usage_count = df['用途'].isna().sum()
+        missing_usage_count = df["用途"].isna().sum()
         logger.info(f"Found {missing_usage_count} missing values in '用途' column.")
         # 用途が欠損している行を推定して補完
         df = infer_residential_usage(df)
 
     if "今後の利用目的" in df.columns:
-        missing_feature_count = df['今後の利用目的'].isna().sum()
+        missing_feature_count = df["今後の利用目的"].isna().sum()
         logger.info(f"Found {missing_feature_count} missing values in '今後の利用目的' column.")
         # 欠損値を最頻値で補完(クロス集計結果から)
-        most_common_purpose = df['今後の利用目的'].mode()[0]
-        df['今後の利用目的'] = df['今後の利用目的'].fillna(most_common_purpose)
-        logger.info(f"Filled missing values in '今後の利用目的' with most common value '{most_common_purpose}'.")
+        most_common_purpose = df["今後の利用目的"].mode()[0]
+        df["今後の利用目的"] = df["今後の利用目的"].fillna(most_common_purpose)
+        logger.info(
+            f"Filled missing values in '今後の利用目的' with most common value '{most_common_purpose}'."
+        )
 
     if "都市計画" in df.columns:
-        missing_urban_planning_count = df['都市計画'].isna().sum()
+        missing_urban_planning_count = df["都市計画"].isna().sum()
         logger.info(f"Found {missing_urban_planning_count} missing values in '都市計画' column.")
         # 欠損値を 'Unknown' で埋める
-        df['都市計画'] = df['都市計画'].fillna('Unknown')
+        df["都市計画"] = df["都市計画"].fillna("Unknown")
         logger.info("Filled missing values in '都市計画' with 'Unknown'.")
 
-    if ["建蔽率（％）", "容積率（％）", "地区名", "市区町村名"] in df.columns:
-        # 建蔽率・容積率を立地ベースで補完
+    # 建蔽率・容積率を立地ベースで補完（必要な列がすべて揃っている時のみ実行）
+    zoning_required_cols = ["建蔽率（％）", "容積率（％）", "地区名", "市区町村名"]
+    if all(col in df.columns for col in zoning_required_cols):
         df = fill_zoning_ratios(df)
 
     if "改装" in df.columns:
-        missing_renovation_count = df['改装'].isna().sum()
+        missing_renovation_count = df["改装"].isna().sum()
         logger.info(f"Found {missing_renovation_count} missing values in '改装' column.")
         # 欠損値を 'Unknown' で埋める
-        df['改装'] = df['改装'].fillna('Unknown')
+        df["改装"] = df["改装"].fillna("Unknown")
         logger.info("Filled missing values in '改装' with 'Unknown'.")
 
     if "取引の事情等" in df.columns:
         # 列を削除
-        df = df.drop(columns=['取引の事情等'])
+        df = df.drop(columns=["取引の事情等"])
         logger.info("Dropped column '取引の事情等'.")
 
     # 例: 日付列 'Date' を datetime 型に変換
-    if 'Date' in df.columns:
-        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+    if "Date" in df.columns:
+        df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
         logger.info("Converted 'Date' column to datetime.")
 
     logger.info("Data cleaning completed.")
