@@ -1,5 +1,4 @@
-<<<<<<< HEAD
-　# 🏠 Tokyo Rent Predictor
+# 🏠 Tokyo Rent Predictor
 
 > 国土交通省「不動産情報ライブラリ」のデータを活用した東京都賃貸物件の賃料予測モデル
 
