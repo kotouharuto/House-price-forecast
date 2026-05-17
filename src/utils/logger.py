@@ -23,18 +23,45 @@ _MAX_BYTES = 5 * 1024 * 1024
 _BACKUP_COUNT = 3
 
 
+def _resolve_log_filename(name: str) -> str:
+    """ロガー名から出力ファイル名を導出する.
+
+    例:
+        ``src.preprocessing.clean`` -> ``clean.log``
+        ``src.modeling.train``      -> ``train.log``
+        ``__main__``                -> ``app.log`` (デフォルトへフォールバック)
+
+    Args:
+        name: ロガー名（``__name__`` で渡される）。
+
+    Returns:
+        ``logs/`` 配下に作成するログファイル名。
+    """
+    # ドット区切りの最後の要素をモジュール名として採用
+    module_name = name.rsplit(".", 1)[-1]
+
+    # __main__ や空文字など特殊ケースはデフォルトへ集約
+    if not module_name or module_name == "__main__":
+        return _DEFAULT_LOG_FILE
+
+    return f"{module_name}.log"
+
+
 def get_logger(
     name: str,
     level: int = logging.INFO,
-    log_file: str = _DEFAULT_LOG_FILE,
+    log_file: str | None = None,
 ) -> logging.Logger:
     """名前付きロガーを取得する.
+
+    出力先のログファイルは ``name`` から自動的に導出される。
+    例: ``get_logger("src.preprocessing.clean")`` -> ``logs/clean.log``
 
     Args:
         name: ロガー名（通常は ``__name__`` を渡す）。
         level: ログレベル。デフォルトは ``logging.INFO``。
-        log_file: 出力先ファイル名。``logs/`` 配下に作成される。
-            モジュールごとに別ファイルへ分けたい場合に指定する。
+        log_file: 出力先ファイル名を明示指定したい場合に渡す。
+            ``None`` の場合は ``name`` から自動導出される。
 
     Returns:
         ファイル出力ハンドラを設定済みのロガー。
@@ -49,7 +76,10 @@ def get_logger(
     logger.propagate = False
 
     _LOG_DIR.mkdir(parents=True, exist_ok=True)
-    log_path = _LOG_DIR / log_file
+
+    # 明示指定が無ければ name から自動導出
+    resolved_log_file = log_file if log_file is not None else _resolve_log_filename(name)
+    log_path = _LOG_DIR / resolved_log_file
 
     handler = RotatingFileHandler(
         log_path,

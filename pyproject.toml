@@ -18,7 +18,7 @@ dependencies = [
     "streamlit",
     "jupyter",
     "ipykernel",
-    "matplotlib-fontja"
+    "matplotlib-fontja",
 ]
 
 [build-system]

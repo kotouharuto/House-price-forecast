@@ -1,42 +1,80 @@
-"""データ前処理および特徴量エンジニアリングを行うモジュール."""
+"""データフレームの欠損値補完を行うモジュール."""
 
-import matplotlib_fontja  # noqa: F401
+# 標準ライブラリ
+import math
+import re
+import sys
+import time
+from pathlib import Path
+
+# サードパーティ
 import pandas as pd
 
-from utils.logger import get_logger
+# プロジェクトルートを sys.path に追加（src.xxx を import するため）
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
+
+# プロジェクト内モジュール（sys.path 操作後である必要があるため E402 を許容）
+from src.utils.logger import get_logger  # noqa: E402
+from src.utils.utils import load_data  # noqa: E402
+
+# モジュール定数
+# 前処理済みデータの保存先（プロジェクトルート基準の絶対パスで固定）
+_PROCESSED_DIR = _PROJECT_ROOT / "data" / "processed"
 
 # ロガーの初期化
 logger = get_logger(__name__)
 
+# 和暦→西暦変換用の基準年（元号1年 = base + 1 になる）
+_WAREKI_BASE_YEAR = {
+    "令和": 2018,  # 令和1年 = 2019
+    "平成": 1988,  # 平成1年 = 1989
+    "昭和": 1925,  # 昭和1年 = 1926
+    "大正": 1911,  # 大正1年 = 1912
+    "明治": 1867,  # 明治1年 = 1868
+}
+_WAREKI_PATTERN = re.compile(r"(令和|平成|昭和|大正|明治)(\d+)年")
+_SEIREKI_PATTERN = re.compile(r"^(\d{4})")
 
-def load_data(file_path: str) -> pd.DataFrame:
-    """CSVファイルからデータをロードする.
+
+def parse_construction_year(value: object) -> float:
+    """建築年文字列を西暦の数値に変換する.
+
+    国土交通省の不動産情報ライブラリでは建築年が和暦表記
+    （例: ``平成5年``, ``昭和60年``）で記録されているため、
+    数値計算可能な西暦に変換する。``"戦前"`` などの解釈不能な値は
+    ``NaN`` として扱う。
 
     Args:
-        file_path: CSVファイルのパス。
+        value: 建築年の値。和暦・西暦・NaN のいずれかを想定。
 
     Returns:
-        ロードしたデータフレーム。
-
-    Raises:
-        FileNotFoundError: 指定したCSVファイルが存在しない場合。
-        UnicodeDecodeError: CP932 でデコードできないバイトが含まれていた場合。
-        pd.errors.ParserError: CSVの構造が壊れていてパースに失敗した場合。
+        西暦の年数（float）。変換不能な場合は ``NaN``。
     """
-    logger.info(f"Loading data from {file_path}...")
-    try:
-        df = pd.read_csv(file_path, encoding="cp932")
-        logger.info(f"Data loaded successfully with shape {df.shape}.")
-        return df
-    except FileNotFoundError:
-        logger.error(f"File not found: {file_path}")
-        raise
-    except UnicodeDecodeError:
-        logger.error(f"Failed to decode {file_path} with cp932 encoding.")
-        raise
-    except pd.errors.ParserError:
-        logger.error(f"Failed to parse CSV file: {file_path}")
-        raise
+    # NaN・None は NaN を返す
+    if value is None:
+        return float("nan")
+    if isinstance(value, float) and math.isnan(value):
+        return float("nan")
+
+    text = str(value).strip()
+    if not text:
+        return float("nan")
+
+    # 和暦表記の判定（例: "平成5年"）
+    match = _WAREKI_PATTERN.match(text)
+    if match:
+        era, year_str = match.groups()
+        return float(_WAREKI_BASE_YEAR[era] + int(year_str))
+
+    # 既に西暦表記（例: "2010" や "2010年"）
+    match_seireki = _SEIREKI_PATTERN.match(text)
+    if match_seireki:
+        return float(match_seireki.group(1))
+
+    # "戦前" 等の解釈不能な値
+    return float("nan")
 
 
 def infer_residential_usage(df: pd.DataFrame, score_threshold: int = 2) -> pd.DataFrame:
@@ -57,17 +95,45 @@ def infer_residential_usage(df: pd.DataFrame, score_threshold: int = 2) -> pd.Da
     # 副作用を避けるためコピー
     result = df.copy()
 
+    # 用途列が無ければ補完対象がないのでそのまま返す
+    if "用途" not in result.columns:
+        logger.warning("'用途' 列が存在しないため infer_residential_usage をスキップします。")
+        return result
+
     # 欠損行のマスク
     mask_missing = result["用途"].isna()
 
-    # 各住宅指標（True=住宅らしい）をベクトル化で算出
-    has_madori = result["間取り"].notna()
+    # 列ごとに「存在すれば指標、無ければ全行 False」として扱うためのヘルパー
+    def _flag_or_false(condition: pd.Series | None) -> pd.Series:
+        if condition is None:
+            return pd.Series(False, index=result.index)
+        return condition.fillna(False)
+
+    # 各住宅指標（True=住宅らしい）。参照する列が無ければその指標は使わない
+    has_madori = _flag_or_false(
+        result["間取り"].notna() if "間取り" in result.columns else None
+    )
 
     residential_structures = ["ＲＣ", "ＳＲＣ", "木造", "鉄骨造", "軽量鉄骨造", "ブロック造"]
-    has_residential_structure = result["建物の構造"].isin(residential_structures)
+    has_residential_structure = _flag_or_false(
+        result["建物の構造"].isin(residential_structures)
+        if "建物の構造" in result.columns
+        else None
+    )
 
     residential_types = ["中古マンション等", "宅地(建物)"]
-    has_residential_type = result["種類"].isin(residential_types)
+    has_residential_type = _flag_or_false(
+        result["種類"].isin(residential_types) if "種類" in result.columns else None
+    )
+
+    # 参照できなかった列があればログに警告
+    missing_cols = [
+        col for col in ("間取り", "建物の構造", "種類") if col not in result.columns
+    ]
+    if missing_cols:
+        logger.warning(
+            f"infer_residential_usage: 以下の列が無いため指標から除外: {missing_cols}"
+        )
 
     # スコア合算
     score = (
@@ -105,7 +171,7 @@ def fill_zoning_ratios(df: pd.DataFrame) -> pd.DataFrame:
         建蔽率・容積率を補完した新しいDataFrame。
     """
     result = df.copy()
-    target_cols = ["建蔽率（％）", "容積率（％）"]
+    target_cols = ["建ぺい率（％）", "容積率（％）"]
 
     for col in target_cols:
         # 1. 地区名グループの最頻値で埋める
@@ -126,7 +192,7 @@ def fill_zoning_ratios(df: pd.DataFrame) -> pd.DataFrame:
     return result
 
 
-def clean_data(df: pd.DataFrame) -> pd.DataFrame:
+def refine_data(df: pd.DataFrame) -> pd.DataFrame:
     """データのクリーニングを行う.
 
     - 不要な列の削除
@@ -146,6 +212,10 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
         df = df.drop(columns=["ID"])
         logger.info("Dropped column 'ID'.")
 
+    # if "種類" in df.columns:
+    #     df = df.drop(columns=["種類"])
+    #     logger.info("Dropped column '種類'.")
+
     if "最寄駅：名称" in df.columns:
         missing_station_count = df["最寄駅：名称"].isna().sum()
         logger.info(f"Found {missing_station_count} missing values in '最寄駅：名称' column.")
@@ -154,15 +224,16 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
         logger.info("Filled missing values in '最寄駅：名称' with 'Unknown'.")
 
     if "最寄駅：距離（分）" in df.columns:
+        df["最寄駅：距離（分）"] = pd.to_numeric(df["最寄駅：距離（分）"], errors="coerce")
         missing_distance_count = df["最寄駅：距離（分）"].isna().sum()
         logger.info(
             f"Found {missing_distance_count} missing values in '最寄駅：距離（分）' column."
         )
-        # 欠損値を中央値で埋める
-        median_distance = df["最寄駅：距離（分）"].median()
-        df["最寄駅：距離（分）"] = df["最寄駅：距離（分）"].fillna(median_distance)
+        # 欠損値を最頻値で埋める
+        mode_distance = df["最寄駅：距離（分）"].mode()[0]
+        df["最寄駅：距離（分）"] = df["最寄駅：距離（分）"].fillna(mode_distance)
         logger.info(
-            f"Filled missing values in '最寄駅：距離（分）' with median value {median_distance}."
+            f"Filled missing values in '最寄駅：距離（分）' with mode value {mode_distance}."
         )
 
     if "間取り" in df.columns:
@@ -172,13 +243,22 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
         df["間取り"] = df["間取り"].fillna("Unknown")
         logger.info("Filled missing values in '間取り' with 'Unknown'.")
 
-    if "築年数" in df.columns:
-        missing_age_count = df["築年数"].isna().sum()
-        logger.info(f"Found {missing_age_count} missing values in '築年数' column.")
+    if "建築年" in df.columns:
+        # 和暦表記（"平成5年" 等）を西暦の数値に変換。"戦前" 等は NaN になる
+        df["建築年"] = df["建築年"].map(parse_construction_year)
+        missing_construction_year_count = int(df["建築年"].isna().sum())
+        logger.info(f"Found {missing_construction_year_count} missing values in '建築年' column.")
         # 欠損値を中央値で埋める
-        median_age = df["築年数"].median()
-        df["築年数"] = df["築年数"].fillna(median_age)
-        logger.info(f"Filled missing values in '築年数' with median value {median_age}.")
+        median_construction_year = df["建築年"].median()
+        df["建築年"] = df["建築年"].fillna(median_construction_year)
+        logger.info(f"Filled missing values in '建築年' with median value {median_construction_year}.")
+
+        # 築年数を計算（西暦に変換済みなので数値演算可能）
+        current_year = pd.Timestamp.now().year
+        df["築年数"] = current_year - df["建築年"]
+        logger.info("Calculated '築年数' from '建築年'.")
+
+    # 注: 「築年数」のNaN補完は不要。建築年を先にmedian補完してから引き算するため。
 
     if "建物の構造" in df.columns:
         missing_structure_count = df["建物の構造"].isna().sum()
@@ -211,7 +291,7 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
         logger.info("Filled missing values in '都市計画' with 'Unknown'.")
 
     # 建蔽率・容積率を立地ベースで補完（必要な列がすべて揃っている時のみ実行）
-    zoning_required_cols = ["建蔽率（％）", "容積率（％）", "地区名", "市区町村名"]
+    zoning_required_cols = ["建ぺい率（％）", "容積率（％）", "地区名", "市区町村名"]
     if all(col in df.columns for col in zoning_required_cols):
         df = fill_zoning_ratios(df)
 
@@ -233,4 +313,30 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
         logger.info("Converted 'Date' column to datetime.")
 
     logger.info("Data cleaning completed.")
+    return df
+
+
+def preprocess_data(file_path: str) -> pd.DataFrame:
+    """データの前処理を一括で実行する関数.
+
+    Args:
+        file_path: CSVファイルのパス。
+
+    Returns:
+        前処理されたデータフレーム。
+    """
+    start_time = time.time()
+    fill_nan_df = load_data(file_path)
+    df = refine_data(fill_nan_df)
+
+    # 出力先ディレクトリを自動作成して、プロジェクトルート基準で保存する
+    # （notebook / CLI など実行場所に依存せず常に同じ場所に出力される）
+    _PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
+    output_path = _PROCESSED_DIR / "cleaned_data.csv"
+    df.to_csv(output_path, index=False, encoding="cp932")
+    logger.info(f"Saved cleaned data to {output_path}")
+
+    end_time = time.time()
+    logger.info(f"Data preprocessing completed in {end_time - start_time:.2f} seconds.")
+
     return df
