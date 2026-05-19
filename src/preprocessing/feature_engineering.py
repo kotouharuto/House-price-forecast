@@ -24,6 +24,14 @@ from src.utils.utils import load_data  # noqa: E402
 # 生データの配置先（プロジェクトルート基準の絶対パスで固定）
 _DATA_RAW_DIR = _PROJECT_ROOT / "data" / "raw"
 
+# 地球の半径（km）。haversine 距離計算に使用
+_EARTH_RADIUS_KM = 6371
+
+# 山手線のバウンディングボックス（簡易な内側判定用）
+# 北端: 田端(35.738) / 南端: 品川(35.628) / 西端: 新宿(139.700) / 東端: 秋葉原(139.780)
+_YAMANOTE_LAT_RANGE = (35.628, 35.738)
+_YAMANOTE_LON_RANGE = (139.700, 139.780)
+
 # ロガーの初期化
 logger = get_logger(__name__)
 
@@ -120,6 +128,41 @@ def categorize_zoning(zoning):
         return "住居系"  # 1中住専、1種住居など
     else:
         return "その他"
+
+def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """2地点間の haversine（大円）距離を km 単位で計算する.
+
+    Args:
+        lat1: 地点1の緯度。
+        lon1: 地点1の経度。
+        lat2: 地点2の緯度。
+        lon2: 地点2の経度。
+
+    Returns:
+        2地点間の距離（km）。
+    """
+    phi1, phi2 = np.radians(lat1), np.radians(lat2)
+    dphi = np.radians(lat2 - lat1)
+    dlambda = np.radians(lon2 - lon1)
+
+    a = np.sin(dphi / 2) ** 2 + np.cos(phi1) * np.cos(phi2) * np.sin(dlambda / 2) ** 2
+    return _EARTH_RADIUS_KM * 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
+
+
+def add_yamanote_inside_flag(df: pd.DataFrame) -> pd.DataFrame:
+    """山手線の内側にある物件にフラグを立てる.
+
+    山手線駅の緯度経度のバウンディングボックスで判定する簡易版。
+    北端: 田端(35.738) / 南端: 品川(35.628)
+    西端: 新宿(139.700) / 東端: 秋葉原(139.780)
+    """
+    df = df.copy()
+    if {"最寄駅：緯度", "最寄駅：経度"}.issubset(df.columns):
+        df["山手線内側"] = (
+            df["最寄駅：緯度"].between(*_YAMANOTE_LAT_RANGE)
+            & df["最寄駅：経度"].between(*_YAMANOTE_LON_RANGE)
+        ).astype(int)
+    return df
 
 
 def categorical_normalization(df: pd.DataFrame) -> pd.DataFrame:
@@ -293,6 +336,73 @@ def build_features(df: pd.DataFrame) -> pd.DataFrame:
 
     return df
 
+def generate_features(df: pd.DataFrame) -> pd.DataFrame:
+    """新規特徴量を生成するモジュール.
+
+    Args:
+        df: データフレーム.
+
+    Returns:
+        特徴量エンジニアリングを施したデータフレーム.
+    """
+
+    # 対数変換した 面積（㎡）
+    if "面積（㎡）" in df.columns:
+        df["log_面積"] = np.log(df["面積（㎡）"].replace(0, np.nan))
+        logger.info("Generated 'log_面積' feature by applying log transformation to '面積（㎡）'.")
+
+    # 対数変換した 最寄駅：距離（分）
+    if "最寄駅：距離（分）" in df.columns:
+        df["log_最寄駅：距離"] = np.log(df["最寄駅：距離（分）"].replace(0, np.nan))
+        logger.info("Generated 'log_最寄駅：距離' feature by applying log transformation to '最寄駅：距離（分）'.")
+
+    # 築年数^2 経年劣化の加速度を表現するため
+    if "築年数" in df.columns:
+        df["築年数^2"] = df["築年数"] ** 2
+        logger.info("Generated '築年数^2' feature by squaring the '築年数' column.")
+
+    # 中心地からの距離
+    if {"最寄駅：緯度", "最寄駅：経度"}.issubset(df.columns):
+        # 東京駅の緯度経度（中心地の代表点として）
+        tokyo_lat, tokyo_lon = 35.681236, 139.767125
+
+        df["中心地_距離"] = df.apply(
+            lambda row: haversine(
+                row["最寄駅：緯度"], row["最寄駅：経度"], tokyo_lat, tokyo_lon
+            )
+            if pd.notnull(row["最寄駅：緯度"]) and pd.notnull(row["最寄駅：経度"])
+            else np.nan,
+            axis=1,
+        )
+        logger.info("Generated '中心地_距離' feature by calculating Haversine distance to Tokyo Station.")
+
+    # 山手線の内側かどうかを判定
+    if {"最寄駅：緯度", "最寄駅：経度"}.issubset(df.columns):
+        df["最寄駅：緯度"] = pd.to_numeric(df["最寄駅：緯度"], errors="coerce")
+        df["最寄駅：経度"] = pd.to_numeric(df["最寄駅：経度"], errors="coerce")
+
+        # 山手線内側フラグ（都心プレミアム捕捉用）
+        df["山手線内側"] = (
+            df["最寄駅：緯度"].between(35.628, 35.738)
+            & df["最寄駅：経度"].between(139.700, 139.780)
+        ).astype(int)
+
+        logger.info("Added '山手線内側' flag.")
+
+    # 建ぺい率、容積率関連
+    if {"容積率（％）", "建ぺい率（％）"}.issubset(df.columns):
+        df["容積消化率（％）"] = df["容積率（％）"] / df["建ぺい率（％）"]
+        df["log_建ぺい率"] = np.log(df["建ぺい率（％）"].replace(0, np.nan))
+        df["log_容積率"] = np.log(df["容積率（％）"].replace(0, np.nan))
+        logger.info("Added 容積消化率 in dataframe.")
+
+    # 容積率と駅徒歩の組み合わせ
+    if {"容積率（％）", "最寄駅：距離（分）"}.issubset(df.columns):
+        df["容積距離"] = df["容積率（％）"] * df["最寄駅：距離（分）"]
+        logger.info("Added 容積距離 in dataframe")
+
+    return df
+
 
 def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     """特徴量エンジニアリングを実行するモジュール.
@@ -306,5 +416,5 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     df = categorical_normalization(df)  # カテゴリ変数の表記を正規化
     df = build_features(df)  # 特徴量の変換を行う
     df = categorize_features(df)  # 該当列を category 型に一括変換
-
+    df = generate_features(df)  # 新規特徴量の生成
     return df
