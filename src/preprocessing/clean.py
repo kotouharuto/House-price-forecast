@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 
 # サードパーティ
+import numpy as np
 import pandas as pd
 
 # プロジェクトルートを sys.path に追加（src.xxx を import するため）
@@ -316,6 +317,50 @@ def refine_data(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def outlier_handling(df: pd.DataFrame) -> pd.DataFrame:
+    """外れ値の処理を行う.
+
+    例: 取引価格（総額）が極端に高い・低い行を削除するなど。
+
+    Args:
+        df: クリーニングされたデータフレーム。
+
+    Returns:
+        外れ値処理後のデータフレーム。
+    """
+
+    # 取引総額（価格） を対数変換
+    if "取引価格（総額）" in df.columns:
+        df["取引価格（総額）"] = pd.to_numeric(df["取引価格（総額）"], errors="coerce")
+        # 0以下の値は対数変換できないので削除
+        df = df[df["取引価格（総額）"] > 0]
+        df["取引価格（総額）"] = np.log(df["取引価格（総額）"])
+        logger.info("Applied log transformation to '取引価格（総額）' and removed non-positive values.")
+
+    # 300㎡を超える 面積（㎡） は異常値とみなして削除
+    if "面積（㎡）" in df.columns:
+        initial_count = len(df)
+        df = df[df["面積（㎡）"] <= 300]
+        final_count = len(df)
+        logger.info(f"Removed outliers in '面積（㎡）': {initial_count - final_count} rows removed.")
+
+    # 建ぺい率（％）
+    if "建ぺい率（％）" in df.columns:
+        initial_count = len(df)
+        df = df[df["建ぺい率（％）"] <= 600.0]
+        final_count = len(df)
+        logger.info(f"Removed outliers in '建ぺい率（％）': {initial_count - final_count} rows removed.")
+
+    # 容積率（％）: 60.0 <= x <= 800.0で採用
+    if "容積率（％）" in df.columns:
+        initial_count = len(df)
+        df = df[(df["容積率（％）"] >= 60.0) & (df["容積率（％）"] <= 800.0)]
+        final_count = len(df)
+        logger.info(f"Removed outliers in '容積率（％）': {initial_count - final_count} rows removed.")
+
+    return df
+
+
 def preprocess_data(file_path: str) -> pd.DataFrame:
     """データの前処理を一括で実行する関数.
 
@@ -328,7 +373,7 @@ def preprocess_data(file_path: str) -> pd.DataFrame:
     start_time = time.time()
     fill_nan_df = load_data(file_path)
     df = refine_data(fill_nan_df)
-
+    df = outlier_handling(df)
     # 出力先ディレクトリを自動作成して、プロジェクトルート基準で保存する
     # （notebook / CLI など実行場所に依存せず常に同じ場所に出力される）
     _PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
