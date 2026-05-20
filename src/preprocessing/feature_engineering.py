@@ -411,10 +411,15 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         特徴量エンジニアリングを施したデータフレーム.
     """
+    start_time = time.time()
 
     df = merge_station_data(df)  # 駅情報データと結合
     df = categorical_normalization(df)  # カテゴリ変数の表記を正規化
     df = build_features(df)  # 特徴量の変換を行う
     df = categorize_features(df)  # 該当列を category 型に一括変換
     df = generate_features(df)  # 新規特徴量の生成
+
+    end_time = time.time()
+    logger.info(f"Data feature engineering completed in {end_time - start_time:.2f} seconds.")
+
     return df

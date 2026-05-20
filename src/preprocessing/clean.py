@@ -358,6 +358,18 @@ def outlier_handling(df: pd.DataFrame) -> pd.DataFrame:
         final_count = len(df)
         logger.info(f"Removed outliers in '容積率（％）': {initial_count - final_count} rows removed.")
 
+    # 築年数の負値（建築年が未来の前売り物件）は 0 にクリップする
+    if "築年数" in df.columns:
+        n_negative = int((df["築年数"] < 0).sum())
+        if n_negative > 0:
+            df["築年数"] = df["築年数"].clip(lower=0)
+            logger.info(f"Clipped {n_negative} negative '築年数' values to 0.")
+
+    # 完全重複行を削除する
+    initial_count = len(df)
+    df = df.drop_duplicates()
+    logger.info(f"Removed {initial_count - len(df)} duplicate rows.")
+
     return df
 
 
