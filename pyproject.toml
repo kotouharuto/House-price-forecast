@@ -68,6 +68,8 @@ ignore = [
 "tests/**/*.py" = ["N802"]
 # __init__.py は再エクスポート目的でのF401(未使用import)を許容
 "**/__init__.py" = ["F401"]
+# 機械学習コードは X, y, X_train 等の大文字命名が標準のため N803/N806 を許容
+"src/modeling/*.py" = ["N803", "N806"]
 
 [tool.ruff.format]
 quote-style = "double"

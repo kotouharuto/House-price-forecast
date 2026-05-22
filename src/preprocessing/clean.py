@@ -8,7 +8,6 @@ import time
 from pathlib import Path
 
 # サードパーティ
-import numpy as np
 import pandas as pd
 
 # プロジェクトルートを sys.path に追加（src.xxx を import するため）
@@ -329,13 +328,13 @@ def outlier_handling(df: pd.DataFrame) -> pd.DataFrame:
         外れ値処理後のデータフレーム。
     """
 
-    # 取引総額（価格） を対数変換
-    if "取引価格（総額）" in df.columns:
-        df["取引価格（総額）"] = pd.to_numeric(df["取引価格（総額）"], errors="coerce")
-        # 0以下の値は対数変換できないので削除
-        df = df[df["取引価格（総額）"] > 0]
-        df["取引価格（総額）"] = np.log(df["取引価格（総額）"])
-        logger.info("Applied log transformation to '取引価格（総額）' and removed non-positive values.")
+    # # 取引総額（価格） を対数変換
+    # if "取引価格（総額）" in df.columns:
+    #     df["取引価格（総額）"] = pd.to_numeric(df["取引価格（総額）"], errors="coerce")
+    #     # 0以下の値は対数変換できないので削除
+    #     df = df[df["取引価格（総額）"] > 0]
+    #     df["取引価格（総額）"] = np.log(df["取引価格（総額）"])
+    #     logger.info("Applied log transformation to '取引価格（総額）' and removed non-positive values.")
 
     # 300㎡を超える 面積（㎡） は異常値とみなして削除
     if "面積（㎡）" in df.columns:
@@ -357,18 +356,6 @@ def outlier_handling(df: pd.DataFrame) -> pd.DataFrame:
         df = df[(df["容積率（％）"] >= 60.0) & (df["容積率（％）"] <= 800.0)]
         final_count = len(df)
         logger.info(f"Removed outliers in '容積率（％）': {initial_count - final_count} rows removed.")
-
-    # 築年数の負値（建築年が未来の前売り物件）は 0 にクリップする
-    if "築年数" in df.columns:
-        n_negative = int((df["築年数"] < 0).sum())
-        if n_negative > 0:
-            df["築年数"] = df["築年数"].clip(lower=0)
-            logger.info(f"Clipped {n_negative} negative '築年数' values to 0.")
-
-    # 完全重複行を削除する
-    initial_count = len(df)
-    df = df.drop_duplicates()
-    logger.info(f"Removed {initial_count - len(df)} duplicate rows.")
 
     return df
 

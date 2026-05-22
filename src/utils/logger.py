@@ -6,6 +6,7 @@ RotatingFileHandlerで世代管理する。
 from __future__ import annotations
 
 import logging
+import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
@@ -29,7 +30,8 @@ def _resolve_log_filename(name: str) -> str:
     例:
         ``src.preprocessing.clean`` -> ``clean.log``
         ``src.modeling.train``      -> ``train.log``
-        ``__main__``                -> ``app.log`` (デフォルトへフォールバック)
+        ``__main__`` (python train.py 実行時) -> 実行スクリプト名から ``train.log``
+        導出不能な場合                -> ``app.log`` (デフォルトへフォールバック)
 
     Args:
         name: ロガー名（``__name__`` で渡される）。
@@ -40,8 +42,16 @@ def _resolve_log_filename(name: str) -> str:
     # ドット区切りの最後の要素をモジュール名として採用
     module_name = name.rsplit(".", 1)[-1]
 
-    # __main__ や空文字など特殊ケースはデフォルトへ集約
-    if not module_name or module_name == "__main__":
+    # __main__（python xxx.py で直接実行）の場合は実行スクリプト名から導出する
+    # （例: python src/modeling/train.py -> "train.log"）
+    if module_name == "__main__":
+        script_stem = Path(sys.argv[0]).stem if sys.argv and sys.argv[0] else ""
+        if script_stem and script_stem != "__main__":
+            return f"{script_stem}.log"
+        return _DEFAULT_LOG_FILE
+
+    # 空文字など特殊ケースはデフォルトへ集約
+    if not module_name:
         return _DEFAULT_LOG_FILE
 
     return f"{module_name}.log"

@@ -61,6 +61,8 @@ def run_pipeline(raw_path: Path = _RAW_DATA_PATH, output_path: Path = _OUTPUT_PA
     print("\n--- 欠損数（上位10列） ---")
     print(df.isna().sum().sort_values(ascending=False).head(10).to_string())
 
+    return df
+
 
 if __name__ == "__main__":
     run_pipeline()
