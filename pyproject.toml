@@ -19,6 +19,7 @@ dependencies = [
     "jupyter",
     "ipykernel",
     "matplotlib-fontja",
+    "optuna>=4.8.0",
 ]
 
 [build-system]
