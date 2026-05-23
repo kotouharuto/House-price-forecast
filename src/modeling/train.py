@@ -21,6 +21,7 @@ if str(_PROJECT_ROOT) not in sys.path:
 
 # プロジェクト内モジュール（sys.path 操作後である必要があるため E402 を許容）
 from src.preprocessing.run_pipeline import run_pipeline  # noqa: E402
+from src.utils.config import load_model_params  # noqa: E402
 from src.utils.logger import get_logger  # noqa: E402
 
 # モジュール定数
@@ -71,14 +72,8 @@ def main() -> None:
     y = df["log_取引価格"]
     X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=42)
 
-    # モデル構築
-    model = LGBMRegressor(
-        objective="regression", metric="rmse", n_estimators=1000,
-        learning_rate=0.05, num_leaves=31, min_child_samples=20,
-        subsample=0.8, subsample_freq=1, colsample_bytree=0.8,
-        reg_alpha=0.1, reg_lambda=0.1,
-        random_state=42, n_jobs=-1, verbose=-1,
-    )
+    # モデル構築（ハイパーパラメータは configs/model_params.yaml から読み込む）
+    model = LGBMRegressor(**load_model_params("lgbm"))
 
     # 学習・予測
     model.fit(X_train, y_train)

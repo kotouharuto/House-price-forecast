@@ -1,0 +1,20 @@
+# モデルのハイパーパラメータ定義
+# train.py から src.utils.config.load_model_params() 経由で読み込む。
+# セクション名（例: lgbm）= モデル種別。新しいモデルを追加する場合はセクションを増やす。
+
+# LightGBM 回帰モデル（取引価格の対数を予測）
+lgbm:
+  objective: regression       # 損失関数（L2 = MSE 最小化）
+  metric: rmse                # 検証指標
+  n_estimators: 1000          # ブースティング反復回数（決定木の本数）
+  learning_rate: 0.05         # 学習率
+  num_leaves: 31              # 1本の決定木の最大葉数（モデルの複雑さ）
+  min_child_samples: 20       # 葉に必要な最小データ数（過学習抑制）
+  subsample: 0.8              # 行サンプリング率（バギング）
+  subsample_freq: 1           # サブサンプリングを行う頻度（反復ごと）
+  colsample_bytree: 0.8       # 列サンプリング率（木ごとの特徴量割合）
+  reg_alpha: 0.1              # L1 正則化項
+  reg_lambda: 0.1             # L2 正則化項
+  random_state: 42            # 再現性のための乱数シード
+  n_jobs: -1                  # 並列スレッド数（-1 = 全コア）
+  verbose: -1                 # ログ出力レベル（-1 = 抑制）
