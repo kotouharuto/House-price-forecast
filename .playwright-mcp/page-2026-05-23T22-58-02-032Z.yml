@@ -1,0 +1,389 @@
+- generic:
+  - generic:
+    - generic [ref=e2]:
+      - generic [ref=e7]:
+        - button "keyboard_double_arrow_left" [ref=e458] [cursor=pointer]:
+          - generic [ref=e460]: keyboard_double_arrow_left
+        - list [ref=e10]:
+          - listitem [ref=e11]:
+            - link "streamlit app" [ref=e13] [cursor=pointer]:
+              - /url: http://localhost:8501/
+              - paragraph [ref=e16]: streamlit app
+          - listitem [ref=e17]:
+            - link "BIダッシュボード" [ref=e19] [cursor=pointer]:
+              - /url: http://localhost:8501/BIダッシュボード
+              - paragraph [ref=e22]: BIダッシュボード
+        - generic [ref=e26]:
+          - heading "フィルタ" [level=2] [ref=e30]
+          - generic [ref=e32]:
+            - paragraph [ref=e36]: 行政区（市区町村名）
+            - generic [ref=e39]:
+              - generic [ref=e40]:
+                - button "千代田区, close by backspace":
+                  - generic "千代田区" [ref=e517]
+                  - img [ref=e519] [cursor=pointer]
+                - combobox "Selected 千代田区. 行政区（市区町村名）" [ref=e521]
+              - generic [ref=e43]:
+                - button "Clear all" [ref=e522] [cursor=pointer]
+                - img "open" [ref=e44] [cursor=pointer]
+          - generic [ref=e525]:
+            - paragraph [ref=e529]: 最寄駅
+            - generic [ref=e532]:
+              - generic [ref=e533]:
+                - combobox "最寄駅" [expanded] [active] [ref=e535]
+                - generic: Choose options
+              - img "open" [ref=e537] [cursor=pointer]
+          - generic [ref=e62]:
+            - paragraph [ref=e66]: 物件種類
+            - generic [ref=e69]:
+              - generic [ref=e70]:
+                - combobox "物件種類" [ref=e72]
+                - generic: Choose options
+              - img "open" [ref=e74] [cursor=pointer]
+          - generic [ref=e77]:
+            - paragraph [ref=e81]: 価格帯
+            - generic [ref=e84]:
+              - generic [ref=e85]:
+                - combobox "価格帯" [ref=e87]
+                - generic: Choose options
+              - img "open" [ref=e89] [cursor=pointer]
+          - generic [ref=e93]:
+            - paragraph [ref=e97]: 面積（㎡）
+            - generic [ref=e98]:
+              - generic [ref=e101]:
+                - slider "面積（㎡）" [ref=e102]:
+                  - generic:
+                    - generic:
+                      - paragraph: "10.00"
+                - slider "面積（㎡）" [ref=e103]:
+                  - generic:
+                    - generic:
+                      - paragraph: "240.00"
+              - generic:
+                - generic:
+                  - paragraph: "10.00"
+                - generic:
+                  - paragraph: "240.00"
+          - generic [ref=e107]:
+            - paragraph [ref=e111]: 築年数
+            - generic [ref=e112]:
+              - generic [ref=e115]:
+                - slider "築年数" [ref=e116]:
+                  - generic:
+                    - generic:
+                      - paragraph: "-1.00"
+                - slider "築年数" [ref=e117]:
+                  - generic:
+                    - generic:
+                      - paragraph: "72.00"
+              - generic:
+                - generic:
+                  - paragraph: "-1.00"
+                - generic:
+                  - paragraph: "72.00"
+          - generic [ref=e120]:
+            - paragraph [ref=e124]: 山手線内側
+            - radiogroup "山手線内側" [ref=e125] [cursor=pointer]:
+              - generic [ref=e126]:
+                - radio "すべて" [checked]
+                - paragraph [ref=e131]: すべて
+              - generic [ref=e132]:
+                - radio "内側のみ"
+                - paragraph [ref=e137]: 内側のみ
+              - generic [ref=e138]:
+                - radio "外側のみ"
+                - paragraph [ref=e143]: 外側のみ
+      - generic [ref=e3]:
+        - banner [ref=e146]:
+          - generic [ref=e149]:
+            - button "Deploy" [ref=e151] [cursor=pointer]:
+              - generic [ref=e153]: Deploy
+            - button "Main menu" [ref=e155] [cursor=pointer]:
+              - img [ref=e156]
+        - generic [ref=e159]:
+          - heading "予測結果 BIダッシュボード" [level=1] [ref=e164]:
+            - text: 予測結果 BIダッシュボード
+            - generic [ref=e165]:
+              - link "Link to heading":
+                - /url: "#bi"
+                - img
+          - paragraph [ref=e170]: "表示対象: 118 件 / 全 7,932 件"
+          - heading "KPIサマリ" [level=3] [ref=e175]:
+            - text: KPIサマリ
+            - generic [ref=e176]:
+              - link "Link to heading":
+                - /url: "#kpi"
+                - img
+          - generic [ref=e178]:
+            - generic [ref=e183]:
+              - paragraph [ref=e186]: 件数
+              - paragraph [ref=e189]: "118"
+            - generic [ref=e194]:
+              - paragraph [ref=e197]: R²(log)
+              - paragraph [ref=e200]: "0.905"
+            - generic [ref=e205]:
+              - paragraph [ref=e208]: MAE
+              - paragraph [ref=e211]: 2,512万円
+            - generic [ref=e216]:
+              - paragraph [ref=e219]: RMSE
+              - paragraph [ref=e222]: 7,151万円
+            - generic [ref=e227]:
+              - paragraph [ref=e230]: MAPE
+              - paragraph [ref=e233]: 18.6%
+            - generic [ref=e238]:
+              - paragraph [ref=e241]: Median APE
+              - paragraph [ref=e244]: 11.6%
+          - paragraph [ref=e249]: 各指標の意味は docs/evaluation_metrics.md を参照。
+          - generic [ref=e251]:
+            - tablist [ref=e253]:
+              - tab "予測精度" [selected] [ref=e254] [cursor=pointer]:
+                - paragraph [ref=e256]: 予測精度
+              - tab "エリア別" [ref=e257] [cursor=pointer]:
+                - paragraph [ref=e259]: エリア別
+              - tab "特徴量" [ref=e260] [cursor=pointer]:
+                - paragraph [ref=e262]: 特徴量
+            - tabpanel "予測精度" [ref=e265]:
+              - generic [ref=e266]:
+                - heading "予測 vs 実測" [level=3] [ref=e271]:
+                  - text: 予測 vs 実測
+                  - generic [ref=e272]:
+                    - link "Link to heading":
+                      - /url: "#vs"
+                      - img
+                - generic [ref=e544]:
+                  - img:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic: "0"
+                          - generic:
+                            - generic: 200M
+                          - generic:
+                            - generic: 400M
+                          - generic:
+                            - generic: 600M
+                          - generic:
+                            - generic: 800M
+                        - generic:
+                          - generic:
+                            - generic: "0"
+                          - generic:
+                            - generic: 200M
+                          - generic:
+                            - generic: 400M
+                          - generic:
+                            - generic: 600M
+                          - generic:
+                            - generic: 800M
+                  - img:
+                    - generic:
+                      - generic [ref=e563]: y=x（完全予測）
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic: "50"
+                          - generic:
+                            - generic: "100"
+                          - generic:
+                            - generic: "150"
+                          - generic:
+                            - generic: "200"
+                          - generic:
+                            - generic: "250"
+                        - generic:
+                          - generic:
+                            - generic: APE(%)
+                      - generic:
+                        - generic: 実測価格(円)
+                      - generic:
+                        - generic: 予測価格(円)
+                  - toolbar [ref=e565]:
+                    - button "Download plot as a PNG" [ref=e567] [cursor=pointer]:
+                      - img [ref=e568]
+                    - generic [ref=e570]:
+                      - button "Zoom" [ref=e571] [cursor=pointer]:
+                        - img [ref=e572]
+                      - button "Pan" [ref=e574] [cursor=pointer]:
+                        - img [ref=e575]
+                    - generic [ref=e577]:
+                      - button "Zoom in" [ref=e578] [cursor=pointer]:
+                        - img [ref=e579]
+                      - button "Zoom out" [ref=e581] [cursor=pointer]:
+                        - img [ref=e582]
+                      - button "Autoscale" [ref=e584] [cursor=pointer]:
+                        - img [ref=e585]
+                      - button "Reset axes" [ref=e587] [cursor=pointer]:
+                        - img [ref=e588]
+                    - button "Fullscreen" [ref=e591] [cursor=pointer]:
+                      - img [ref=e592]
+                  - img
+                - heading "誤差分布" [level=3] [ref=e332]:
+                  - text: 誤差分布
+                  - generic [ref=e333]:
+                    - link "Link to heading":
+                      - /url: "#f89ce3"
+                      - img
+                - generic [ref=e335]:
+                  - paragraph [ref=e339]: 表示する指標
+                  - radiogroup "表示する指標" [ref=e340] [cursor=pointer]:
+                    - generic [ref=e341]:
+                      - radio "APE(%)" [checked]
+                      - paragraph [ref=e346]: APE(%)
+                    - generic [ref=e347]:
+                      - radio "残差(円)"
+                      - paragraph [ref=e352]: 残差(円)
+                - generic [ref=e599]:
+                  - img:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic: "0"
+                          - generic:
+                            - generic: "50"
+                          - generic:
+                            - generic: "100"
+                          - generic:
+                            - generic: "150"
+                          - generic:
+                            - generic: "200"
+                          - generic:
+                            - generic: "250"
+                        - generic:
+                          - generic:
+                            - generic: "0"
+                          - generic:
+                            - generic: "10"
+                          - generic:
+                            - generic: "20"
+                          - generic:
+                            - generic: "30"
+                          - generic:
+                            - generic: "40"
+                          - generic:
+                            - generic: "50"
+                  - img:
+                    - generic:
+                      - generic:
+                        - generic: APE(%)
+                      - generic:
+                        - generic: count
+                  - toolbar [ref=e613]:
+                    - button "Download plot as a PNG" [ref=e615] [cursor=pointer]:
+                      - img [ref=e616]
+                    - generic [ref=e618]:
+                      - button "Zoom" [ref=e619] [cursor=pointer]:
+                        - img [ref=e620]
+                      - button "Pan" [ref=e622] [cursor=pointer]:
+                        - img [ref=e623]
+                    - generic [ref=e625]:
+                      - button "Zoom in" [ref=e626] [cursor=pointer]:
+                        - img [ref=e627]
+                      - button "Zoom out" [ref=e629] [cursor=pointer]:
+                        - img [ref=e630]
+                      - button "Autoscale" [ref=e632] [cursor=pointer]:
+                        - img [ref=e633]
+                      - button "Reset axes" [ref=e635] [cursor=pointer]:
+                        - img [ref=e636]
+                    - button "Fullscreen" [ref=e639] [cursor=pointer]:
+                      - img [ref=e640]
+                  - img
+                - heading "価格帯別の件数と精度" [level=3] [ref=e405]:
+                  - text: 価格帯別の件数と精度
+                  - generic [ref=e406]:
+                    - link "Link to heading":
+                      - /url: "#401b2983"
+                      - img
+                - generic [ref=e647]:
+                  - img:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic: ~2000万
+                          - generic:
+                            - generic: 2000万~5000万
+                          - generic:
+                            - generic: 5000万~1億
+                          - generic:
+                            - generic: 1億~3億
+                          - generic:
+                            - generic: 3億~
+                        - generic:
+                          - generic:
+                            - generic: "0"
+                          - generic:
+                            - generic: "5"
+                          - generic:
+                            - generic: "10"
+                          - generic:
+                            - generic: "15"
+                          - generic:
+                            - generic: "20"
+                          - generic:
+                            - generic: "25"
+                          - generic:
+                            - generic: "30"
+                          - generic:
+                            - generic: "35"
+                  - img:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic: "10"
+                          - generic:
+                            - generic: "15"
+                          - generic:
+                            - generic: "20"
+                        - generic:
+                          - generic:
+                            - generic: 平均APE(%)
+                      - generic:
+                        - generic: 価格帯
+                      - generic:
+                        - generic: 件数
+                  - toolbar [ref=e661]:
+                    - button "Download plot as a PNG" [ref=e663] [cursor=pointer]:
+                      - img [ref=e664]
+                    - generic [ref=e666]:
+                      - button "Zoom" [ref=e667] [cursor=pointer]:
+                        - img [ref=e668]
+                      - button "Pan" [ref=e670] [cursor=pointer]:
+                        - img [ref=e671]
+                    - generic [ref=e673]:
+                      - button "Zoom in" [ref=e674] [cursor=pointer]:
+                        - img [ref=e675]
+                      - button "Zoom out" [ref=e677] [cursor=pointer]:
+                        - img [ref=e678]
+                      - button "Autoscale" [ref=e680] [cursor=pointer]:
+                        - img [ref=e681]
+                      - button "Reset axes" [ref=e683] [cursor=pointer]:
+                        - img [ref=e684]
+                    - button "Fullscreen" [ref=e687] [cursor=pointer]:
+                      - img [ref=e688]
+                  - img
+    - list [ref=e698]:
+      - generic [ref=e700]:
+        - option "Select all" [selected] [ref=e701] [cursor=pointer]:
+          - generic [ref=e705]: Select all
+        - option "九段下" [ref=e706] [cursor=pointer]:
+          - generic [ref=e710]: 九段下
+        - option "半蔵門" [ref=e711] [cursor=pointer]:
+          - generic [ref=e715]: 半蔵門
+        - option "大手町" [ref=e716] [cursor=pointer]:
+          - generic [ref=e720]: 大手町
+        - option "小伝馬町" [ref=e721] [cursor=pointer]:
+          - generic [ref=e725]: 小伝馬町
+        - option "小川町" [ref=e726] [cursor=pointer]:
+          - generic [ref=e730]: 小川町
+        - option "岩本町" [ref=e731] [cursor=pointer]:
+          - generic [ref=e735]: 岩本町
+        - option "市ケ谷" [ref=e736] [cursor=pointer]:
+          - generic [ref=e740]: 市ケ谷
+        - option "御茶ノ水" [ref=e741] [cursor=pointer]:
+          - generic [ref=e745]: 御茶ノ水
+        - option "新御茶ノ水" [ref=e746] [cursor=pointer]:
+          - generic [ref=e750]: 新御茶ノ水
+  - img [ref=e455]
