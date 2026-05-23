@@ -72,7 +72,13 @@ def main() -> None:
     X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=42)
 
     # モデル構築
-    model = LGBMRegressor()
+    model = LGBMRegressor(
+        objective="regression", metric="rmse", n_estimators=1000,
+        learning_rate=0.05, num_leaves=31, min_child_samples=20,
+        subsample=0.8, subsample_freq=1, colsample_bytree=0.8,
+        reg_alpha=0.1, reg_lambda=0.1,
+        random_state=42, n_jobs=-1, verbose=-1,
+    )
 
     # 学習・予測
     model.fit(X_train, y_train)
