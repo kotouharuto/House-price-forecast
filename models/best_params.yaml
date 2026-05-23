@@ -1,0 +1,16 @@
+objective: regression
+metric: rmse
+boosting_type: gbdt
+subsample_freq: 1
+random_state: 42
+n_jobs: -1
+verbose: -1
+n_estimators: 1244
+learning_rate: 0.057836285514494726
+num_leaves: 140
+max_depth: 9
+min_child_samples: 19
+subsample: 0.7342620045124907
+colsample_bytree: 0.7093609803512364
+reg_alpha: 0.5663889739355514
+reg_lambda: 0.018379189201777894

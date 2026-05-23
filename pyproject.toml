@@ -20,6 +20,7 @@ dependencies = [
     "ipykernel",
     "matplotlib-fontja",
     "optuna>=4.8.0",
+    "optuna-integration[lightgbm]",
     "pyyaml",
     "mypy>=2.0.0",
 ]

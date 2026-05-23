@@ -2,19 +2,62 @@
 # train.py から src.utils.config.load_model_params() 経由で読み込む。
 # セクション名（例: lgbm）= モデル種別。新しいモデルを追加する場合はセクションを増やす。
 
-# LightGBM 回帰モデル（取引価格の対数を予測）
+# LightGBM 回帰モデル（取引価格の対数を予測）の固定パラメータ
+# Optunaで探索しない、全試行で共通のパラメータ
 lgbm:
   objective: regression       # 損失関数（L2 = MSE 最小化）
   metric: rmse                # 検証指標
-  n_estimators: 1000          # ブースティング反復回数（決定木の本数）
-  learning_rate: 0.05         # 学習率
-  num_leaves: 31              # 1本の決定木の最大葉数（モデルの複雑さ）
-  min_child_samples: 20       # 葉に必要な最小データ数（過学習抑制）
-  subsample: 0.8              # 行サンプリング率（バギング）
+  boosting_type: gbdt         # ブースティング種別
   subsample_freq: 1           # サブサンプリングを行う頻度（反復ごと）
-  colsample_bytree: 0.8       # 列サンプリング率（木ごとの特徴量割合）
-  reg_alpha: 0.1              # L1 正則化項
-  reg_lambda: 0.1             # L2 正則化項
   random_state: 42            # 再現性のための乱数シード
   n_jobs: -1                  # 並列スレッド数（-1 = 全コア）
   verbose: -1                 # ログ出力レベル（-1 = 抑制）
+
+# Optuna が探索するハイパーパラメータの範囲
+# type: int / float、log: true で対数スケール探索
+lgbm_search_space:
+  n_estimators:
+    type: int
+    low: 100
+    high: 2000
+  learning_rate:
+    type: float
+    low: 0.01
+    high: 0.3
+    log: true
+  num_leaves:
+    type: int
+    low: 15
+    high: 255
+  max_depth:
+    type: int
+    low: 3
+    high: 12
+  min_child_samples:
+    type: int
+    low: 5
+    high: 100
+  subsample:
+    type: float
+    low: 0.6
+    high: 1.0
+  colsample_bytree:
+    type: float
+    low: 0.6
+    high: 1.0
+  reg_alpha:
+    type: float
+    low: 0.001
+    high: 10.0
+    log: true
+  reg_lambda:
+    type: float
+    low: 0.001
+    high: 10.0
+    log: true
+
+# Optuna・データ分割の設定
+optuna:
+  n_trials: 50      # Optuna の試行回数
+  test_size: 0.2    # テストデータの割合
+  val_size: 0.2     # 検証データの割合（全体に対する割合）
