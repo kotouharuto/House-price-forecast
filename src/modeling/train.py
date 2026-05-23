@@ -5,6 +5,8 @@ import sys
 import time
 from pathlib import Path
 
+import joblib
+
 # サードパーティ
 import numpy as np
 import pandas as pd
@@ -25,8 +27,30 @@ from src.utils.logger import get_logger  # noqa: E402
 # 生データの配置先（プロジェクトルート基準の絶対パスで固定）
 _DATA_RAW_DIR = _PROJECT_ROOT / "data" / "raw"
 
+# モデル保存設定
+_MODEL_DIR = _PROJECT_ROOT / "models"
+_MODEL_DIR.mkdir(parents=True, exist_ok=True)
+
 # ロガーの初期化
 logger = get_logger(__name__)
+
+
+def evaluate_regression(y_true_log: pd.Series, y_pred_log: np.ndarray) -> dict[str, float]:
+    """log価格予測モデルをlogスケール・円スケールの両方で評価する"""
+    y_true_yen = np.exp(y_true_log)
+    y_pred_yen = np.exp(y_pred_log)
+
+    abs_error_yen = np.abs(y_true_yen - y_pred_yen)
+    ape = abs_error_yen / y_true_yen * 100
+
+    return {
+        "r2_log": r2_score(y_true_log, y_pred_log),
+        "rmse_log": np.sqrt(mean_squared_error(y_true_log, y_pred_log)),
+        "mae_yen": mean_absolute_error(y_true_yen, y_pred_yen),
+        "rmse_yen": np.sqrt(mean_squared_error(y_true_yen, y_pred_yen)),
+        "mape": float(np.mean(ape)),
+        "median_ape": float(np.median(ape)),
+    }
 
 
 def main() -> None:
@@ -54,22 +78,19 @@ def main() -> None:
     model.fit(X_train, y_train)
     y_pred_log = model.predict(X_test)
 
-    # logスケール(モデルの素の性能)
-    r2 = r2_score(y_test, y_pred_log)
-    rmse_log = np.sqrt(mean_squared_error(y_test, y_pred_log))  # ≒ RMSLE
+    # 評価
+    metrics = evaluate_regression(y_test, y_pred_log)
 
-    # 元スケール(円) - 解釈用
-    y_test_yen = np.exp(y_test)
-    y_pred_yen = np.exp(y_pred_log)
-    rmse_yen = np.sqrt(mean_squared_error(y_test_yen, y_pred_yen))
-    mae_yen = mean_absolute_error(y_test_yen, y_pred_yen)
-    mape = np.mean(np.abs((y_test_yen - y_pred_yen) / y_test_yen)) * 100
+    logger.info(f"R2 log score: {metrics['r2_log']:.3f}")  # 価格のばらつきの説明具合(%)
+    logger.info(f"RMSE log score: {metrics['rmse_log']:.3f}")  # 価格の二乗平均平方根誤差
+    logger.info(f"MAE yen score: {metrics['mae_yen']:.0f}")  # 円スケールでの平均絶対誤差
+    logger.info(f"RMSE yen score: {metrics['rmse_yen']:.0f}")  # 円スケールでの二乗平均平方根誤差
+    logger.info(f"MAPE score: {metrics['mape']:.3f}")  # 平均絶対パーセント誤差
+    logger.info(f"Median APE score: {metrics['median_ape']:.3f}")  # 中央絶対パーセント誤差
 
-    logger.info(f"R2 score: {r2:.3f}")
-    logger.info(f"RMSE log score: {rmse_log:.3f}")
-    logger.info(f"rmse_yen score: {rmse_yen:.3f}")
-    logger.info(f"mae_yen score: {mae_yen:.3f}")
-    logger.info(f"mape score: {mape:.3f}")
+    # モデル保存
+    joblib.dump(model, _MODEL_DIR / "lgbm_model.pkl")
+    logger.info(f"モデルを保存: {_MODEL_DIR / 'lgbm_model.pkl'}")
 
     logger.info(f"モデル学習完了: 所要時間 {time.time() - start_time:.2f} 秒")
 
