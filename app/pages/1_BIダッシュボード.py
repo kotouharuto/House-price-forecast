@@ -178,8 +178,8 @@ def _render_error_distribution(df: pd.DataFrame) -> None:
     if metric == "APE(%)":
         fig = px.histogram(df, x=APE_COL, nbins=50, labels={APE_COL: "APE(%)"})
     else:
-        residual = df[ACTUAL_PRICE_COL] - df[PRED_PRICE_COL]
-        fig = px.histogram(x=residual, nbins=50, labels={"x": "残差(円) = 実測 - 予測"})
+        residual = df[PRED_PRICE_COL] - df[ACTUAL_PRICE_COL]
+        fig = px.histogram(x=residual, nbins=50, labels={"x": "残差(円) = 予測 - 実測"})
     st.plotly_chart(fig, use_container_width=True)
 
 
