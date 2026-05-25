@@ -20,25 +20,31 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _DEFAULT_PRED_PATH = _PROJECT_ROOT / "outputs" / "test_predictions.csv"
 
 # 予測結果CSVの列名（マジック文字列を避けるため定数化）
-PRED_PRICE_COL = "pred_price_yen"
 ACTUAL_PRICE_COL = "actual_price_yen"
+PRED_PRICE_COL = "pred_price_yen"
+ERROR_RATE_COL = "error_rate_percent"
 APE_COL = "ape_percent"
+PRICE_BAND_COL = "actual_price_band"
+WARD_CODE_COL = "市区町村コード"
+ADDRESS_COL = "住所"
 STATION_COL = "最寄駅：名称"
 STATION_LAT_COL = "最寄駅：緯度"
 STATION_LON_COL = "最寄駅：経度"
-WARD_CODE_COL = "市区町村コード"
-
-# フィルタ・KPIで参照する列（任意。存在する場合のみ利用する）
 TYPE_COL = "種類"
-PRICE_BAND_COL = "actual_price_band"
 AREA_COL = "面積（㎡）"
 AGE_COL = "築年数"
+CITY_PLAN_COL = "都市計画"
+STATION_DISTANCE_COL = "最寄駅：距離（分）"
 YAMANOTE_COL = "山手線内側"
 ACTUAL_LOG_COL = "actual_log_price"
 PRED_LOG_COL = "pred_log_price"
 
 # 集計に最低限必要な列（読み込み時に存在を検証する）
-_REQUIRED_COLUMNS: tuple[str, ...] = (PRED_PRICE_COL, ACTUAL_PRICE_COL, APE_COL)
+_REQUIRED_COLUMNS: tuple[str, ...] = (
+    ACTUAL_PRICE_COL,
+    PRED_PRICE_COL,
+    APE_COL,
+)
 
 
 def load_predictions(file_path: str | Path = _DEFAULT_PRED_PATH) -> pd.DataFrame:
