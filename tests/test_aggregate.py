@@ -7,10 +7,12 @@ import pandas as pd
 import pytest
 
 from src.visualization.aggregate import (
+    _DEFAULT_PRED_PATH,
     aggregate_by_station,
     aggregate_by_ward,
     aggregate_predictions,
     available_stations,
+    default_predictions_path,
     filter_predictions,
     load_predictions,
     price_band_order,
@@ -36,6 +38,7 @@ def _sample_df() -> pd.DataFrame:
             "山手線内側": [1, 1, 0],
             "pred_price_yen": [100, 300, 1000],
             "actual_price_yen": [110, 290, 900],
+            "error_yen": [-10, 10, 100],  # pred - actual
             "ape_percent": [10.0, 20.0, 30.0],
         }
     )
@@ -124,12 +127,53 @@ def test_load_predictions_raises_when_file_missing(tmp_path: Path) -> None:
 
 
 def test_load_predictions_raises_when_required_column_missing(tmp_path: Path) -> None:
-    """必須列が欠落している場合に KeyError を送出すること."""
+    """必須列が欠落している場合に、不足列名を含む KeyError を送出すること."""
     csv_path = tmp_path / "bad.csv"
     _sample_df().drop(columns=["ape_percent"]).to_csv(csv_path, index=False, encoding="utf-8")
 
-    with pytest.raises(KeyError):
+    with pytest.raises(KeyError) as exc_info:
         load_predictions(csv_path)
+    assert "ape_percent" in str(exc_info.value)
+
+
+def test_load_predictions_raises_when_error_yen_missing(tmp_path: Path) -> None:
+    """P0-2: error_yen が欠落している場合にも KeyError を送出すること."""
+    csv_path = tmp_path / "no_error_yen.csv"
+    _sample_df().drop(columns=["error_yen"]).to_csv(csv_path, index=False, encoding="utf-8")
+
+    with pytest.raises(KeyError) as exc_info:
+        load_predictions(csv_path)
+    assert "error_yen" in str(exc_info.value)
+
+
+def test_default_predictions_path_falls_back_when_env_unset(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """BI_PREDICTIONS_PATH 未設定時は既定パスを返すこと."""
+    monkeypatch.delenv("BI_PREDICTIONS_PATH", raising=False)
+
+    assert default_predictions_path() == _DEFAULT_PRED_PATH
+
+
+def test_default_predictions_path_uses_env_when_set(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """BI_PREDICTIONS_PATH 設定時はそのパスを返すこと."""
+    custom = tmp_path / "custom.csv"
+    monkeypatch.setenv("BI_PREDICTIONS_PATH", str(custom))
+
+    assert default_predictions_path() == custom
+
+
+def test_load_predictions_uses_env_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """引数なし呼び出し時に BI_PREDICTIONS_PATH のCSVを読むこと."""
+    csv_path = tmp_path / "env.csv"
+    _sample_df().to_csv(csv_path, index=False, encoding="utf-8")
+    monkeypatch.setenv("BI_PREDICTIONS_PATH", str(csv_path))
+
+    df = load_predictions()
+
+    assert len(df) == 3
 
 
 def test_filter_predictions_no_condition_returns_all() -> None:

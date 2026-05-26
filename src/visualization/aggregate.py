@@ -5,6 +5,7 @@ BIツール（``app/pages/``）から利用する、UIに依存しない純粋�
 集計テーブルを生成する。Streamlit等のUI依存を持たないため、単体でテスト可能。
 """
 
+import os
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -19,9 +20,13 @@ logger = get_logger(__name__)
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _DEFAULT_PRED_PATH = _PROJECT_ROOT / "outputs" / "test_predictions.csv"
 
+# 入力CSVパスを切り替える環境変数（別モデル・別出力の確認用）
+_PRED_PATH_ENV_VAR = "BI_PREDICTIONS_PATH"
+
 # 予測結果CSVの列名（マジック文字列を避けるため定数化）
 ACTUAL_PRICE_COL = "actual_price_yen"
 PRED_PRICE_COL = "pred_price_yen"
+ERROR_YEN_COL = "error_yen"
 ERROR_RATE_COL = "error_rate_percent"
 APE_COL = "ape_percent"
 PRICE_BAND_COL = "actual_price_band"
@@ -39,20 +44,46 @@ YAMANOTE_COL = "山手線内側"
 ACTUAL_LOG_COL = "actual_log_price"
 PRED_LOG_COL = "pred_log_price"
 
-# 集計に最低限必要な列（読み込み時に存在を検証する）
+# 読み込み時に存在を検証する必須列（ダッシュボードが実際に参照する列に限定）。
+# log列（actual_log_price/pred_log_price）は summarize_metrics が欠損を許容する
+# 設計のため、また 住所・都市計画 等の未使用列は正常CSVを弾かないため含めない。
 _REQUIRED_COLUMNS: tuple[str, ...] = (
     ACTUAL_PRICE_COL,
     PRED_PRICE_COL,
+    ERROR_YEN_COL,
     APE_COL,
+    PRICE_BAND_COL,
+    WARD_CODE_COL,
+    STATION_COL,
+    STATION_LAT_COL,
+    STATION_LON_COL,
+    TYPE_COL,
+    AREA_COL,
+    AGE_COL,
+    YAMANOTE_COL,
 )
 
 
-def load_predictions(file_path: str | Path = _DEFAULT_PRED_PATH) -> pd.DataFrame:
+def default_predictions_path() -> Path:
+    """予測結果CSVの既定パスを返す.
+
+    環境変数 ``BI_PREDICTIONS_PATH`` が設定されていればそのパスを、
+    未設定なら ``outputs/test_predictions.csv`` を返す。別モデル・別出力の
+    結果を確認する際に、コード変更なしで入力を切り替えられるようにする。
+
+    Returns:
+        予測結果CSVのパス。
+    """
+    env_path = os.environ.get(_PRED_PATH_ENV_VAR)
+    return Path(env_path) if env_path else _DEFAULT_PRED_PATH
+
+
+def load_predictions(file_path: str | Path | None = None) -> pd.DataFrame:
     """予測結果CSVを読み込み、必須列の存在を検証する.
 
     Args:
-        file_path: 予測結果CSVのパス。デフォルトは
-            ``outputs/test_predictions.csv``。
+        file_path: 予測結果CSVのパス。``None`` の場合は
+            :func:`default_predictions_path`（環境変数または既定パス）を使う。
 
     Returns:
         予測結果のデータフレーム。
@@ -61,7 +92,7 @@ def load_predictions(file_path: str | Path = _DEFAULT_PRED_PATH) -> pd.DataFrame
         FileNotFoundError: 指定したCSVファイルが存在しない場合。
         KeyError: 集計に必要な列が欠落している場合。
     """
-    path = Path(file_path)
+    path = Path(file_path) if file_path is not None else default_predictions_path()
     if not path.exists():
         logger.error(f"予測結果ファイルが見つかりません: {path}")
         raise FileNotFoundError(f"予測結果ファイルが見つかりません: {path}")

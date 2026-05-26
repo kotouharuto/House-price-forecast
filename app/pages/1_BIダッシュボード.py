@@ -24,6 +24,7 @@ from src.visualization.aggregate import (  # noqa: E402
     AGE_COL,
     APE_COL,
     AREA_COL,
+    ERROR_YEN_COL,
     PRED_PRICE_COL,
     PRICE_BAND_COL,
     STATION_COL,
@@ -178,8 +179,10 @@ def _render_error_distribution(df: pd.DataFrame) -> None:
     if metric == "APE(%)":
         fig = px.histogram(df, x=APE_COL, nbins=50, labels={APE_COL: "APE(%)"})
     else:
-        residual = df[PRED_PRICE_COL] - df[ACTUAL_PRICE_COL]
-        fig = px.histogram(x=residual, nbins=50, labels={"x": "残差(円) = 予測 - 実測"})
+        # 残差はCSVの error_yen（= 予測 - 実測）をそのまま使い、符号定義を一本化する
+        fig = px.histogram(
+            df, x=ERROR_YEN_COL, nbins=50, labels={ERROR_YEN_COL: "残差(円) = 予測 - 実測"}
+        )
     st.plotly_chart(fig, use_container_width=True)
 
 
