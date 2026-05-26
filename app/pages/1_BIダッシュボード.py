@@ -61,6 +61,18 @@ def _municipality_names() -> dict[int, str]:
     return load_municipality_names()
 
 
+@st.cache_data
+def _aggrefate_ward_cached(df: pd.DataFrame) -> pd.DataFrame:
+    """行政区別の集計(キャッシュ付き)"""
+    return aggregate_by_ward(df)
+
+
+@st.cache_data
+def _aggregate_station_cached(df: pd.DataFrame) -> pd.DataFrame:
+    """駅別の集計"""
+    return aggregate_by_station(df)
+
+
 def _sidebar_filters(df: pd.DataFrame) -> pd.DataFrame:
     """サイドバーのフィルタUIを構築し、絞り込み後のデータフレームを返す.
 
@@ -214,11 +226,11 @@ def _render_ranking(df: pd.DataFrame, *, by_station: bool) -> None:
     """エリア別（行政区 or 駅）のランキング棒グラフを描画する."""
     if by_station:
         st.subheader("駅別ランキング")
-        agg = aggregate_by_station(df)
+        agg = _aggregate_station_cached(df)
         key_col = STATION_COL
     else:
         st.subheader("行政区別ランキング")
-        agg = aggregate_by_ward(df)
+        agg = _aggrefate_ward_cached(df)
         key_col = WARD_CODE_COL
 
     widget_key = "station_rank" if by_station else "ward_rank"
@@ -247,16 +259,28 @@ def _render_ranking(df: pd.DataFrame, *, by_station: bool) -> None:
 
 
 def _render_feature_relation(df: pd.DataFrame) -> None:
-    """面積 × 予測価格（色=築年数）の散布図を描画する."""
-    st.subheader("特徴量と価格の関係（面積 × 予測価格）")
+    """選択した特徴量（面積 or 築年数）× 予測価格の散布図を描画する.
+
+    X軸に選ばなかった方の特徴量を色に割り当て、2つの特徴量を同時に俯瞰できる。
+    """
+    st.subheader("特徴量と価格の関係")
+
+    # X軸は日本語ラベルで選ばせ、選択値から列名を逆引きする
+    feature_labels = {AREA_COL: "面積(㎡)", AGE_COL: "築年数"}
+    label_to_col = {label: col for col, label in feature_labels.items()}
+    x_label = st.selectbox("X軸の特徴量", list(feature_labels.values()), key="feature_x")
+    x_col = label_to_col[x_label]
+    # X軸に選ばれなかった方の特徴量を色に割り当てる
+    color_col = AGE_COL if x_col == AREA_COL else AREA_COL
+
     plot_df = _sample_for_plot(df)
     fig = px.scatter(
         plot_df,
-        x=AREA_COL,
+        x=x_col,
         y=PRED_PRICE_COL,
-        color=AGE_COL,
+        color=color_col,
         opacity=0.5,
-        labels={AREA_COL: "面積(㎡)", PRED_PRICE_COL: "予測価格(円)", AGE_COL: "築年数"},
+        labels={**feature_labels, PRED_PRICE_COL: "予測価格(円)"},
     )
     st.plotly_chart(fig, use_container_width=True)
 
