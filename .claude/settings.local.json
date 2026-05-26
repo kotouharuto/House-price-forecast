@@ -8,7 +8,19 @@
       "Bash(kill 70564 70565)",
       "Bash(uv run *)",
       "Bash(pkill -f 'mypy src/utils/config.py')",
-      "Bash(pkill -f 'uv run mypy')"
+      "Bash(pkill -f 'uv run mypy')",
+      "Bash(pkill -f 'AppTest')",
+      "Bash(lsof -ti:8501)",
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_console_messages",
+      "mcp__playwright__browser_take_screenshot",
+      "mcp__playwright__browser_wait_for",
+      "mcp__playwright__browser_snapshot",
+      "mcp__playwright__browser_click",
+      "Bash(xargs kill)"
     ]
-  }
+  },
+  "disabledMcpjsonServers": [
+    "playwright"
+  ]
 }
