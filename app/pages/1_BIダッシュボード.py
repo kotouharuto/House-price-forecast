@@ -61,6 +61,18 @@ def _municipality_names() -> dict[int, str]:
     return load_municipality_names()
 
 
+@st.cache_data
+def _aggrefate_ward_cached(df: pd.DataFrame) -> pd.DataFrame:
+    """行政区別の集計(キャッシュ付き)"""
+    return aggregate_by_ward(df)
+
+
+@st.cache_data
+def _aggregate_station_cached(df: pd.DataFrame) -> pd.DataFrame:
+    """駅別の集計"""
+    return aggregate_by_station(df)
+
+
 def _sidebar_filters(df: pd.DataFrame) -> pd.DataFrame:
     """サイドバーのフィルタUIを構築し、絞り込み後のデータフレームを返す.
 
@@ -214,11 +226,11 @@ def _render_ranking(df: pd.DataFrame, *, by_station: bool) -> None:
     """エリア別（行政区 or 駅）のランキング棒グラフを描画する."""
     if by_station:
         st.subheader("駅別ランキング")
-        agg = aggregate_by_station(df)
+        agg = _aggregate_station_cached(df)
         key_col = STATION_COL
     else:
         st.subheader("行政区別ランキング")
-        agg = aggregate_by_ward(df)
+        agg = _aggrefate_ward_cached(df)
         key_col = WARD_CODE_COL
 
     widget_key = "station_rank" if by_station else "ward_rank"
