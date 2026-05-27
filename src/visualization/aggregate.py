@@ -189,6 +189,36 @@ def aggregate_by_station(df: pd.DataFrame) -> pd.DataFrame:
     return aggregate_predictions(df, STATION_COL, coord_cols=(STATION_LAT_COL, STATION_LON_COL))
 
 
+def _representative_category(series: pd.Series) -> object:
+    """系列の最頻値を返す（同数なら先頭、空なら ``NaN``）."""
+    mode = series.mode(dropna=True)
+    return mode.iat[0] if not mode.empty else np.nan
+
+
+def station_map_summary(df: pd.DataFrame) -> pd.DataFrame:
+    """地図ポップアップ用に、駅単位の集計へ代表的な物件種類・価格帯を付与する.
+
+    ``aggregate_by_station`` の集計（件数・価格・APE・代表座標）に、駅ごとの
+    最頻の物件種類と価格帯を ``repr_type`` / ``repr_band`` として結合する。
+
+    Args:
+        df: 予測結果のデータフレーム。
+
+    Returns:
+        駅単位の集計に ``repr_type`` / ``repr_band`` を加えたデータフレーム。
+    """
+    agg = aggregate_by_station(df)
+    representative = (
+        df.groupby(STATION_COL, observed=True)
+        .agg(
+            repr_type=(TYPE_COL, _representative_category),
+            repr_band=(PRICE_BAND_COL, _representative_category),
+        )
+        .reset_index()
+    )
+    return agg.merge(representative, on=STATION_COL, how="left")
+
+
 def filter_predictions(
     df: pd.DataFrame,
     ward_codes: Sequence[int] | None = None,
