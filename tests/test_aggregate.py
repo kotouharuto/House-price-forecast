@@ -16,6 +16,7 @@ from src.visualization.aggregate import (
     filter_predictions,
     load_predictions,
     price_band_order,
+    station_map_summary,
     summarize_metrics,
 )
 
@@ -93,6 +94,17 @@ def test_aggregate_by_station_coords_ignore_nan() -> None:
 
     # NaNを除いた残り1件(35.70)が代表座標になる
     assert row["lat"] == pytest.approx(35.70)
+
+
+def test_station_map_summary_adds_representative_categories() -> None:
+    """駅単位集計に代表的な物件種類・価格帯（最頻値）が付与されること."""
+    result = station_map_summary(_sample_df()).set_index("最寄駅：名称")
+
+    # A駅は2件とも中古マンション等／1000万~5000万、B駅は宅地(建物)／5000万~1億
+    assert {"repr_type", "repr_band", "lat", "lon"}.issubset(result.columns)
+    assert result.loc["A駅", "repr_type"] == "中古マンション等"
+    assert result.loc["A駅", "repr_band"] == "1000万~5000万"
+    assert result.loc["B駅", "repr_type"] == "宅地(建物)"
 
 
 def test_aggregate_predictions_raises_when_group_col_missing() -> None:

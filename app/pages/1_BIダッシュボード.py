@@ -19,6 +19,7 @@ if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
 # プロジェクト内モジュール（sys.path 操作後である必要があるため E402 を許容）
+from app.filters import render_sidebar_filters  # noqa: E402
 from src.visualization.aggregate import (  # noqa: E402
     ACTUAL_PRICE_COL,
     AGE_COL,
@@ -28,14 +29,10 @@ from src.visualization.aggregate import (  # noqa: E402
     PRED_PRICE_COL,
     PRICE_BAND_COL,
     STATION_COL,
-    TYPE_COL,
     WARD_CODE_COL,
     aggregate_by_station,
     aggregate_by_ward,
-    available_stations,
-    filter_predictions,
     load_predictions,
-    price_band_order,
     summarize_metrics,
 )
 from src.visualization.format import format_yen_jp  # noqa: E402
@@ -71,63 +68,6 @@ def _aggregate_ward_cached(df: pd.DataFrame) -> pd.DataFrame:
 def _aggregate_station_cached(df: pd.DataFrame) -> pd.DataFrame:
     """駅別の集計"""
     return aggregate_by_station(df)
-
-
-def _sidebar_filters(df: pd.DataFrame) -> pd.DataFrame:
-    """サイドバーのフィルタUIを構築し、絞り込み後のデータフレームを返す.
-
-    フィルタ選択肢の範囲は全件データから決めるため、選択肢は常に安定する。
-
-    Args:
-        df: フィルタ前の全予測結果。
-
-    Returns:
-        フィルタ適用後のデータフレーム。
-    """
-    st.sidebar.header("フィルタ")
-
-    # 行政区は利便性のため市区町村名で選択させ、内部ではコードに変換して絞り込む
-    name_by_code = _municipality_names()
-    present_codes = sorted(df[WARD_CODE_COL].dropna().unique().tolist())
-    ward_labels = [code_to_label(code, name_by_code) for code in present_codes]
-    label_to_code = {code_to_label(code, name_by_code): int(code) for code in present_codes}
-    selected_ward_labels = st.sidebar.multiselect("行政区（市区町村名）", ward_labels)
-    selected_wards = [label_to_code[label] for label in selected_ward_labels]
-
-    # 最寄駅は選択中の行政区内の駅のみに連動して絞り込む（未選択時は全駅）
-    station_options = available_stations(df, selected_wards)
-    selected_stations = st.sidebar.multiselect("最寄駅", station_options)
-
-    types = sorted(df[TYPE_COL].dropna().unique().tolist())
-    selected_types = st.sidebar.multiselect("物件種類", types)
-
-    # 価格帯は金額順（平均実測価格の昇順）で選択肢を並べる
-    bands = price_band_order(df)
-    selected_bands = st.sidebar.multiselect("価格帯", bands)
-
-    area_min, area_max = float(df[AREA_COL].min()), float(df[AREA_COL].max())
-    area_range = st.sidebar.slider("面積（㎡）", area_min, area_max, (area_min, area_max))
-
-    age_min, age_max = float(df[AGE_COL].min()), float(df[AGE_COL].max())
-    age_range = st.sidebar.slider("築年数", age_min, age_max, (age_min, age_max))
-
-    yamanote_label = st.sidebar.radio("山手線内側", ["すべて", "内側のみ", "外側のみ"])
-    yamanote_map: dict[str, bool | None] = {
-        "すべて": None,
-        "内側のみ": True,
-        "外側のみ": False,
-    }
-
-    return filter_predictions(
-        df,
-        ward_codes=selected_wards,
-        stations=selected_stations,
-        property_types=selected_types,
-        price_bands=selected_bands,
-        area_range=area_range,
-        age_range=age_range,
-        yamanote_inside=yamanote_map[yamanote_label],
-    )
 
 
 def _render_kpis(df: pd.DataFrame) -> None:
@@ -333,7 +273,7 @@ def main() -> None:
     st.title("予測結果 BIダッシュボード")
 
     df = _load()
-    filtered = _sidebar_filters(df)
+    filtered = render_sidebar_filters(df, _municipality_names())
     st.caption(f"表示対象: {len(filtered):,} 件 / 全 {len(df):,} 件")
 
     if filtered.empty:
