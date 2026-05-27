@@ -62,7 +62,7 @@ def _municipality_names() -> dict[int, str]:
 
 
 @st.cache_data
-def _aggrefate_ward_cached(df: pd.DataFrame) -> pd.DataFrame:
+def _aggregate_ward_cached(df: pd.DataFrame) -> pd.DataFrame:
     """行政区別の集計(キャッシュ付き)"""
     return aggregate_by_ward(df)
 
@@ -136,12 +136,24 @@ def _render_kpis(df: pd.DataFrame) -> None:
     st.subheader("KPIサマリ")
 
     cols = st.columns(6)
-    cols[0].metric("件数", f"{int(metrics['count']):,}")
-    cols[1].metric("R²(log)", f"{metrics['r2_log']:.3f}")
-    cols[2].metric("MAE", format_yen_jp(metrics["mae_yen"]))
-    cols[3].metric("RMSE", format_yen_jp(metrics["rmse_yen"]))
-    cols[4].metric("MAPE", f"{metrics['mape']:.1f}%")
-    cols[5].metric("Median APE", f"{metrics['median_ape']:.1f}%")
+    cols[0].metric("件数", f"{int(metrics['count']):,}", help="表示対象の物件件数")
+    cols[1].metric(
+        "R²(log)",
+        f"{metrics['r2_log']:.3f}",
+        help="log価格スケールでの決定係数。1に近いほど予測が良い",
+    )
+    cols[2].metric("MAE", format_yen_jp(metrics["mae_yen"]), help="平均絶対誤差（円）")
+    cols[3].metric(
+        "RMSE",
+        format_yen_jp(metrics["rmse_yen"]),
+        help="二乗平均平方根誤差（円）。大きな外れに敏感",
+    )
+    cols[4].metric("MAPE", f"{metrics['mape']:.1f}%", help="平均絶対パーセント誤差（%）")
+    cols[5].metric(
+        "Median APE",
+        f"{metrics['median_ape']:.1f}%",
+        help="絶対パーセント誤差の中央値（%）。外れ値に頑健",
+    )
     st.caption("各指標の意味は docs/evaluation_metrics.md を参照。")
 
 
@@ -152,10 +164,21 @@ def _sample_for_plot(df: pd.DataFrame) -> pd.DataFrame:
     return df.sample(n=_MAX_SCATTER_POINTS, random_state=42)
 
 
+def _render_sampling_note(total: int, shown: int) -> None:
+    """サンプリング表示時に、全件中の表示件数を注記する."""
+    if shown < total:
+        st.caption(
+            f"※ 描画負荷軽減のため、全{total:,}件中{shown:,}件をサンプリング表示しています。"
+        )
+
+
 def _render_scatter(df: pd.DataFrame) -> None:
     """予測 vs 実測の散布図（y=x基準線つき、色=APE）を描画する."""
     st.subheader("予測 vs 実測")
-    plot_df = _sample_for_plot(df)
+    plot_df = _sample_for_plot(df).copy()
+    # ホバーに億・万表記を出すための補助列（軸は円のまま、補助としてツールチップに表示）
+    plot_df["_actual_jp"] = plot_df[ACTUAL_PRICE_COL].map(format_yen_jp)
+    plot_df["_pred_jp"] = plot_df[PRED_PRICE_COL].map(format_yen_jp)
 
     fig = px.scatter(
         plot_df,
@@ -164,11 +187,20 @@ def _render_scatter(df: pd.DataFrame) -> None:
         color=APE_COL,
         color_continuous_scale=_ERROR_COLOR_SCALE,
         opacity=0.5,
+        custom_data=["_actual_jp", "_pred_jp"],
         labels={
             ACTUAL_PRICE_COL: "実測価格(円)",
             PRED_PRICE_COL: "予測価格(円)",
             APE_COL: "APE(%)",
         },
+    )
+    # y=x基準線を追加する前に散布点のみホバーを書き換える
+    fig.update_traces(
+        hovertemplate=(
+            "実測価格: %{customdata[0]}<br>"
+            "予測価格: %{customdata[1]}<br>"
+            "APE: %{marker.color:.1f}%<extra></extra>"
+        )
     )
     limit = float(max(plot_df[ACTUAL_PRICE_COL].max(), plot_df[PRED_PRICE_COL].max()))
     fig.add_trace(
@@ -181,6 +213,7 @@ def _render_scatter(df: pd.DataFrame) -> None:
         )
     )
     st.plotly_chart(fig, use_container_width=True)
+    _render_sampling_note(len(df), len(plot_df))
 
 
 def _render_error_distribution(df: pd.DataFrame) -> None:
@@ -230,7 +263,7 @@ def _render_ranking(df: pd.DataFrame, *, by_station: bool) -> None:
         key_col = STATION_COL
     else:
         st.subheader("行政区別ランキング")
-        agg = _aggrefate_ward_cached(df)
+        agg = _aggregate_ward_cached(df)
         key_col = WARD_CODE_COL
 
     widget_key = "station_rank" if by_station else "ward_rank"
@@ -247,12 +280,21 @@ def _render_ranking(df: pd.DataFrame, *, by_station: bool) -> None:
         name_by_code = _municipality_names()
         top["label"] = top[key_col].map(lambda code: code_to_label(code, name_by_code))
 
+    # 棒のラベル: 予測価格は億・万、APEは%で表示する
+    if value_col == "pred_price_mean":
+        top["_bar_text"] = top[value_col].map(format_yen_jp)
+    else:
+        top["_bar_text"] = top[value_col].map(lambda v: f"{v:.1f}%")
+
     fig = px.bar(
         top,
         x=value_col,
         y="label",
         orientation="h",
-        labels={value_col: metric_label, "label": "エリア"},
+        text="_bar_text",
+        color="mape",  # 棒の色=平均APE。精度の良し悪しを直感的に示す
+        color_continuous_scale=_ERROR_COLOR_SCALE,
+        labels={value_col: metric_label, "label": "エリア", "mape": "平均APE(%)"},
     )
     fig.update_layout(yaxis={"categoryorder": "total ascending"})
     st.plotly_chart(fig, use_container_width=True)
@@ -283,6 +325,7 @@ def _render_feature_relation(df: pd.DataFrame) -> None:
         labels={**feature_labels, PRED_PRICE_COL: "予測価格(円)"},
     )
     st.plotly_chart(fig, use_container_width=True)
+    _render_sampling_note(len(df), len(plot_df))
 
 
 def main() -> None:
