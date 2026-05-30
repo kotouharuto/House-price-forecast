@@ -3,6 +3,7 @@
 プロジェクト共通のロガーを提供する。ファイル出力のみ、
 RotatingFileHandlerで世代管理する。
 """
+
 from __future__ import annotations
 
 import logging

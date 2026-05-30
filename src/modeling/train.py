@@ -269,9 +269,7 @@ def main() -> None:
         pruner=optuna.pruners.MedianPruner(n_warmup_steps=20),
     )
     study.optimize(
-        lambda trial: objective(
-            trial, x_train, y_train, x_val, y_val, search_space, fixed_params
-        ),
+        lambda trial: objective(trial, x_train, y_train, x_val, y_val, search_space, fixed_params),
         n_trials=optuna_config["n_trials"],
     )
     logger.info(f"Optuna 完了: best RMSE_log={study.best_value:.4f}")
