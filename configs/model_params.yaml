@@ -5,7 +5,7 @@
 # LightGBM 回帰モデル（取引価格の対数を予測）の固定パラメータ
 # Optunaで探索しない、全試行で共通のパラメータ
 lgbm:
-  objective: regression       # 損失関数（L2 = MSE 最小化）
+  objective: huber       # 損失関数（L2 = MSE 最小化）
   metric: rmse                # 検証指標
   boosting_type: gbdt         # ブースティング種別
   subsample_freq: 1           # サブサンプリングを行う頻度（反復ごと）
