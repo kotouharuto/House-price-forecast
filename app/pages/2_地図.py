@@ -5,6 +5,7 @@
 クリックで当該エリアの詳細をポップアップ表示する。初期表示は行政区単位。
 """
 
+import html
 import sys
 from pathlib import Path
 from typing import Any
@@ -13,6 +14,7 @@ import branca.colormap as cm
 import folium
 import pandas as pd
 import streamlit as st
+from branca.element import Element
 from streamlit_folium import st_folium
 
 # プロジェクトルートを sys.path に追加（src.xxx / app.xxx を import するため）
@@ -39,6 +41,7 @@ _INITIAL_ZOOM = 11
 _STATION_COLORS = ["#2c7bb6", "#ffffbf", "#d7191c"]
 # 行政区コロプレス用の連続カラースケール（folium組み込みパレット）
 _WARD_FILL_COLOR = "YlOrRd"
+_WARD_LEGEND_COLORS = ["#ffffb2", "#fed976", "#feb24c", "#fd8d3c", "#f03b20", "#bd0026"]
 
 # 色分け指標: ラベル -> (集計列, 金額表示か)
 _METRIC_OPTIONS: dict[str, tuple[str, bool]] = {
@@ -88,6 +91,80 @@ def _or_dash(value: object) -> str:
     return "—" if pd.isna(value) else str(value)
 
 
+def _format_legend_value(value: float, *, is_money: bool) -> str:
+    """地図凡例に収まる短めの値表記を返す."""
+    if is_money:
+        return format_yen_jp(value)
+    return f"{value:.1f}%"
+
+
+def _add_compact_legend(
+    fmap: folium.Map,
+    values: pd.Series,
+    *,
+    colors: list[str],
+    metric_label: str,
+    is_money: bool,
+) -> None:
+    """Foliumの過密な自動凡例の代わりに、最小/最大だけの凡例を追加する."""
+    numeric_values = pd.to_numeric(values, errors="coerce").dropna()
+    if numeric_values.empty:
+        return
+
+    vmin = float(numeric_values.min())
+    vmax = float(numeric_values.max())
+    min_label = html.escape(_format_legend_value(vmin, is_money=is_money))
+    max_label = html.escape(_format_legend_value(vmax, is_money=is_money))
+    title = html.escape(f"{metric_label}（{'円' if is_money else '%'}）")
+    gradient = ", ".join(colors)
+
+    legend_html = f"""
+    <style>
+      .trp-map-legend {{
+        position: absolute;
+        right: 16px;
+        bottom: 24px;
+        z-index: 9999;
+        width: min(280px, calc(100% - 32px));
+        padding: 10px 12px;
+        border: 1px solid rgba(31, 41, 55, 0.18);
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.92);
+        box-shadow: 0 2px 8px rgba(31, 41, 55, 0.16);
+        color: #111827;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 12px;
+        line-height: 1.35;
+      }}
+      .trp-map-legend__title {{
+        margin-bottom: 6px;
+        font-weight: 600;
+      }}
+      .trp-map-legend__bar {{
+        height: 10px;
+        border-radius: 999px;
+        background: linear-gradient(to right, {gradient});
+      }}
+      .trp-map-legend__labels {{
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 5px;
+        white-space: nowrap;
+      }}
+    </style>
+    <div class="trp-map-legend">
+      <div class="trp-map-legend__title">{title}</div>
+      <div class="trp-map-legend__bar"></div>
+      <div class="trp-map-legend__labels">
+        <span>{min_label}</span>
+        <span>{max_label}</span>
+      </div>
+    </div>
+    """
+    fmap.get_root().html.add_child(Element(legend_html))
+
+
 # ---------- 駅ブランチ（円マーカー） ----------
 
 
@@ -121,8 +198,13 @@ def _build_station_map(
     if vmax <= vmin:  # 駅が1件等で範囲が潰れる場合のゼロ除算回避
         vmax = vmin + 1.0
     colormap = cm.LinearColormap(colors=_STATION_COLORS, vmin=vmin, vmax=vmax)
-    colormap.caption = f"{metric_label}（{'円' if is_money else '%'}）"
-    colormap.add_to(fmap)
+    _add_compact_legend(
+        fmap,
+        stations[metric_col],
+        colors=_STATION_COLORS,
+        metric_label=metric_label,
+        is_money=is_money,
+    )
 
     max_count = int(stations["count"].max())
     for _, row in stations.iterrows():
@@ -240,7 +322,7 @@ def _build_ward_map(
     # Choropleth はキー列を文字列で比較するため、市区町村コードを str に変換しておく
     choro_df = summary[[WARD_CODE_COL, metric_col]].copy()
     choro_df[WARD_CODE_COL] = choro_df[WARD_CODE_COL].astype(str)
-    folium.Choropleth(
+    choropleth = folium.Choropleth(
         geo_data=enriched_geojson,
         data=choro_df,
         columns=[WARD_CODE_COL, metric_col],
@@ -250,8 +332,18 @@ def _build_ward_map(
         line_opacity=0.3,
         nan_fill_color="lightgray",
         nan_fill_opacity=0.3,
-        legend_name=f"{metric_label}（{'円' if is_money else '%'}）",
-    ).add_to(fmap)
+    )
+    if choropleth.color_scale is not None:
+        choropleth._children.pop(choropleth.color_scale.get_name(), None)
+        choropleth.color_scale = None
+    choropleth.add_to(fmap)
+    _add_compact_legend(
+        fmap,
+        summary[metric_col],
+        colors=_WARD_LEGEND_COLORS,
+        metric_label=metric_label,
+        is_money=is_money,
+    )
 
     # 透明レイヤを重ねて、クリック時のツールチップ/ポップアップを担当させる（M-5）
     folium.GeoJson(
@@ -259,7 +351,10 @@ def _build_ward_map(
         name="行政区情報",
         style_function=lambda _: {"fillOpacity": 0.0, "color": "transparent", "weight": 0},
         highlight_function=lambda _: {"fillOpacity": 0.2, "fillColor": "#000000"},
-        tooltip=folium.GeoJsonTooltip(fields=["ward_name"], aliases=["行政区:"], sticky=False),
+        # ラベルなしツールチップにして、クリック取得時に行政区名がそのまま返るようにする
+        tooltip=folium.GeoJsonTooltip(
+            fields=["ward_name"], aliases=[""], labels=False, sticky=False
+        ),
         popup=folium.GeoJsonPopup(
             fields=["ward_name", "count_text", "pred_text", "actual_text", "ape_text", "repr_text"],
             aliases=["行政区", "件数", "予測価格", "実測価格", "APE", "代表 種類/価格帯"],
@@ -272,6 +367,59 @@ def _build_ward_map(
 
 # ---------- メイン ----------
 
+# 地図クリック→フィルタ連動（N-1）で使う session_state のキー
+_LAST_CLICK_MARKER_KEY = "_map_last_applied_click"
+_PENDING_FILTER_UPDATE_KEY = "_map_pending_filter_update"
+
+
+def _apply_pending_map_filter_update() -> None:
+    """地図クリックで予約したフィルタ更新を、ウィジェット生成前に反映する."""
+    pending_update = st.session_state.pop(_PENDING_FILTER_UPDATE_KEY, None)
+    if not pending_update:
+        return
+    for key, value in pending_update.items():
+        st.session_state[key] = value
+
+
+def _apply_map_click_to_filters(granularity: str, last_clicked_tooltip: str | None) -> bool:
+    """地図クリックの内容をサイドバーフィルタへ書き戻す（N-1 / 置換セマンティクス）.
+
+    Args:
+        granularity: ``"行政区"`` または ``"駅"``。
+        last_clicked_tooltip: ``st_folium`` が返す ``last_object_clicked_tooltip``。
+            行政区は GeoJsonTooltip で行政区名がそのまま入る前提。
+            駅は ``"<駅名>（<指標>）"`` 形式から駅名を切り出す。
+
+    Returns:
+        フィルタを実際に更新した場合 ``True``、未更新なら ``False``。
+    """
+    if not last_clicked_tooltip:
+        return False
+    marker = (granularity, last_clicked_tooltip)
+    # 同じクリックを何度も適用しない（リランループ防止）
+    if st.session_state.get(_LAST_CLICK_MARKER_KEY) == marker:
+        return False
+    st.session_state[_LAST_CLICK_MARKER_KEY] = marker
+
+    if granularity == "行政区":
+        # クリックされた区のみをフィルタに置換し、駅フィルタは整合のためクリアする
+        ward_name = last_clicked_tooltip.strip()
+        st.session_state[_PENDING_FILTER_UPDATE_KEY] = {
+            "flt_wards": [ward_name],
+            "flt_stations": [],
+        }
+    else:
+        # 駅マーカーのツールチップは "<駅名>（<指標>）" 形式。右側を剥がして駅名を得る
+        station_name = last_clicked_tooltip.rsplit("（", 1)[0].strip()
+        st.session_state[_PENDING_FILTER_UPDATE_KEY] = {"flt_stations": [station_name]}
+    return True
+
+
+def _clear_map_click_selection() -> None:
+    """『クリック選択をクリア』ボタンの処理: 行政区/駅フィルタとクリックマーカーを消す."""
+    for key in ("flt_wards", "flt_stations", _LAST_CLICK_MARKER_KEY, _PENDING_FILTER_UPDATE_KEY):
+        st.session_state.pop(key, None)
+
 
 def main() -> None:
     """ページのエントリポイント."""
@@ -279,17 +427,25 @@ def main() -> None:
 
     df = _load()
     name_by_code = _municipality_names()
+    _apply_pending_map_filter_update()
     filtered = render_sidebar_filters(df, name_by_code)
     if filtered.empty:
         st.warning("条件に一致する物件がありません。フィルタを緩めてください。")
         return
 
     # 仕様: 初期表示=行政区
-    granularity = st.radio(
+    col_g, col_m, col_clear = st.columns([2, 2, 1])
+    granularity = col_g.radio(
         "粒度", _GRANULARITY_OPTIONS, horizontal=True, index=0, key="map_granularity"
     )
-    metric_label = st.selectbox("色分け指標", list(_METRIC_OPTIONS), key="map_metric")
+    metric_label = col_m.selectbox("色分け指標", list(_METRIC_OPTIONS), key="map_metric")
     metric_col, is_money = _METRIC_OPTIONS[metric_label]
+    # 地図クリックで設定した行政区/駅フィルタを解除
+    col_clear.button(
+        "クリック選択をクリア",
+        on_click=_clear_map_click_selection,
+        help="地図クリックで自動設定した行政区/駅フィルタをまとめて解除します",
+    )
 
     if granularity == "行政区":
         try:
@@ -328,7 +484,17 @@ def main() -> None:
             return
         fmap = _build_station_map(plotted, metric_col, is_money=is_money, metric_label=metric_label)
 
-    st_folium(fmap, use_container_width=True, height=600, returned_objects=[])
+    # クリック内容だけを返してもらい、それ以外（ズーム等）では再描画させない
+    result = st_folium(
+        fmap,
+        use_container_width=True,
+        height=600,
+        returned_objects=["last_object_clicked_tooltip"],
+    )
+    last_tooltip = result.get("last_object_clicked_tooltip") if isinstance(result, dict) else None
+    if _apply_map_click_to_filters(granularity, last_tooltip):
+        # 既に上で描画したサイドバーは古い値のため、再実行して新フィルタを反映する
+        st.rerun()
 
 
 main()

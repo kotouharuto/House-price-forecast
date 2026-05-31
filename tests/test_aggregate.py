@@ -19,6 +19,7 @@ from src.visualization.aggregate import (
     station_map_summary,
     summarize_metrics,
     ward_map_summary,
+    worst_properties,
 )
 
 
@@ -106,6 +107,53 @@ def test_station_map_summary_adds_representative_categories() -> None:
     assert result.loc["A駅", "repr_type"] == "中古マンション等"
     assert result.loc["A駅", "repr_band"] == "1000万~5000万"
     assert result.loc["B駅", "repr_type"] == "宅地(建物)"
+
+
+def test_worst_properties_returns_top_n_by_abs_error() -> None:
+    """残差絶対値の降順で上位 N 件を返し、表示用列だけに絞られること."""
+    # _sample_df: error_yen=[-10, 10, 100] → |error|=[10,10,100]、最大は B駅(13213) の100
+    result = worst_properties(_sample_df(), sort_by="abs_error", n=2)
+
+    assert len(result) == 2
+    # 1位は |error|=100 の行（B駅・13213）
+    assert result.iloc[0]["市区町村コード"] == 13213
+    assert result.iloc[0]["error_yen"] == 100
+    # 表示用列のセットだけが含まれる
+    expected_cols = {
+        "種類",
+        "市区町村コード",
+        "最寄駅：名称",
+        "面積（㎡）",
+        "築年数",
+        "actual_price_yen",
+        "pred_price_yen",
+        "error_yen",
+        "ape_percent",
+    }
+    assert set(result.columns) == expected_cols
+    # 内部一時列はリーク禁止
+    assert "_abs_error" not in result.columns
+
+
+def test_worst_properties_sort_by_ape() -> None:
+    """sort_by='ape' で APE 降順上位を返すこと."""
+    # ape=[10, 20, 30] → 1位は ape=30 の行（B駅）
+    result = worst_properties(_sample_df(), sort_by="ape", n=1)
+
+    assert len(result) == 1
+    assert result.iloc[0]["ape_percent"] == 30.0
+
+
+def test_worst_properties_n_exceeds_returns_all() -> None:
+    """n が件数より大きい場合は全件返ること."""
+    result = worst_properties(_sample_df(), n=100)
+    assert len(result) == 3
+
+
+def test_worst_properties_raises_on_invalid_sort_by() -> None:
+    """未対応のソート列で ValueError を送出すること."""
+    with pytest.raises(ValueError, match="未対応"):
+        worst_properties(_sample_df(), sort_by="invalid")
 
 
 def test_ward_map_summary_adds_representative_categories() -> None:
