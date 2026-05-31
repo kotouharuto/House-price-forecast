@@ -18,6 +18,7 @@ from src.visualization.aggregate import (
     price_band_order,
     station_map_summary,
     summarize_metrics,
+    ward_map_summary,
 )
 
 
@@ -105,6 +106,19 @@ def test_station_map_summary_adds_representative_categories() -> None:
     assert result.loc["A駅", "repr_type"] == "中古マンション等"
     assert result.loc["A駅", "repr_band"] == "1000万~5000万"
     assert result.loc["B駅", "repr_type"] == "宅地(建物)"
+
+
+def test_ward_map_summary_adds_representative_categories() -> None:
+    """行政区集計に代表的な物件種類・価格帯（最頻値）が付与されること."""
+    result = ward_map_summary(_sample_df()).set_index("市区町村コード")
+
+    # 13123は2件とも中古マンション等／1000万~5000万、13213は宅地(建物)／5000万~1億
+    assert {"repr_type", "repr_band", "count"}.issubset(result.columns)
+    assert result.loc[13123, "repr_type"] == "中古マンション等"
+    assert result.loc[13123, "repr_band"] == "1000万~5000万"
+    assert result.loc[13213, "repr_type"] == "宅地(建物)"
+    # 行政区集計には地図座標(lat/lon)を含めない（GeoJSONのgeometryが担うため）
+    assert "lat" not in result.columns
 
 
 def test_aggregate_predictions_raises_when_group_col_missing() -> None:

@@ -219,6 +219,31 @@ def station_map_summary(df: pd.DataFrame) -> pd.DataFrame:
     return agg.merge(representative, on=STATION_COL, how="left")
 
 
+def ward_map_summary(df: pd.DataFrame) -> pd.DataFrame:
+    """コロプレス地図ポップアップ用に、行政区単位の集計へ代表値を付与する.
+
+    ``aggregate_by_ward`` の集計（件数・価格・APE）に、行政区ごとの
+    最頻の物件種類と価格帯を ``repr_type`` / ``repr_band`` として結合する。
+    座標は GeoJSON の geometry が担うため、本集計には含まない。
+
+    Args:
+        df: 予測結果のデータフレーム。
+
+    Returns:
+        行政区単位の集計に ``repr_type`` / ``repr_band`` を加えたデータフレーム。
+    """
+    agg = aggregate_by_ward(df)
+    representative = (
+        df.groupby(WARD_CODE_COL, observed=True)
+        .agg(
+            repr_type=(TYPE_COL, _representative_category),
+            repr_band=(PRICE_BAND_COL, _representative_category),
+        )
+        .reset_index()
+    )
+    return agg.merge(representative, on=WARD_CODE_COL, how="left")
+
+
 def filter_predictions(
     df: pd.DataFrame,
     ward_codes: Sequence[int] | None = None,
