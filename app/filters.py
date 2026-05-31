@@ -46,27 +46,35 @@ def render_sidebar_filters(df: pd.DataFrame, name_by_code: dict[int, str]) -> pd
     present_codes = sorted(df[WARD_CODE_COL].dropna().unique().tolist())
     ward_labels = [code_to_label(code, name_by_code) for code in present_codes]
     label_to_code = {code_to_label(code, name_by_code): int(code) for code in present_codes}
-    selected_ward_labels = st.sidebar.multiselect("行政区（市区町村名）", ward_labels)
+    # ウィジェットには明示キーを付与してページ間で選択状態を共有する
+    # （選択肢は常に全件データから決めるため、フィルタ操作で options から外れる心配は無い）
+    selected_ward_labels = st.sidebar.multiselect(
+        "行政区（市区町村名）", ward_labels, key="flt_wards"
+    )
     selected_wards = [label_to_code[label] for label in selected_ward_labels]
 
     # 最寄駅は選択中の行政区内の駅のみに連動して絞り込む（未選択時は全駅）
     station_options = available_stations(df, selected_wards)
-    selected_stations = st.sidebar.multiselect("最寄駅", station_options)
+    selected_stations = st.sidebar.multiselect("最寄駅", station_options, key="flt_stations")
 
     types = sorted(df[TYPE_COL].dropna().unique().tolist())
-    selected_types = st.sidebar.multiselect("物件種類", types)
+    selected_types = st.sidebar.multiselect("物件種類", types, key="flt_types")
 
     # 価格帯は金額順（平均実測価格の昇順）で選択肢を並べる
     bands = price_band_order(df)
-    selected_bands = st.sidebar.multiselect("価格帯", bands)
+    selected_bands = st.sidebar.multiselect("価格帯", bands, key="flt_bands")
 
     area_min, area_max = float(df[AREA_COL].min()), float(df[AREA_COL].max())
-    area_range = st.sidebar.slider("面積（㎡）", area_min, area_max, (area_min, area_max))
+    area_range = st.sidebar.slider(
+        "面積（㎡）", area_min, area_max, (area_min, area_max), key="flt_area"
+    )
 
     age_min, age_max = float(df[AGE_COL].min()), float(df[AGE_COL].max())
-    age_range = st.sidebar.slider("築年数", age_min, age_max, (age_min, age_max))
+    age_range = st.sidebar.slider("築年数", age_min, age_max, (age_min, age_max), key="flt_age")
 
-    yamanote_label = st.sidebar.radio("山手線内側", ["すべて", "内側のみ", "外側のみ"])
+    yamanote_label = st.sidebar.radio(
+        "山手線内側", ["すべて", "内側のみ", "外側のみ"], key="flt_yamanote"
+    )
     yamanote_map: dict[str, bool | None] = {
         "すべて": None,
         "内側のみ": True,

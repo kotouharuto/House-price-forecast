@@ -34,6 +34,7 @@ from src.visualization.aggregate import (  # noqa: E402
     aggregate_by_ward,
     load_predictions,
     summarize_metrics,
+    worst_properties,
 )
 from src.visualization.format import format_yen_jp  # noqa: E402
 from src.visualization.master import code_to_label, load_municipality_names  # noqa: E402
@@ -68,6 +69,12 @@ def _aggregate_ward_cached(df: pd.DataFrame) -> pd.DataFrame:
 def _aggregate_station_cached(df: pd.DataFrame) -> pd.DataFrame:
     """駅別の集計"""
     return aggregate_by_station(df)
+
+
+@st.cache_data
+def _to_csv_bytes(df: pd.DataFrame) -> bytes:
+    """DataFrameを Excel 互換の UTF-8 BOM 付き CSV バイト列に変換する（キャッシュ付き）."""
+    return df.to_csv(index=False).encode("utf-8-sig")
 
 
 def _render_kpis(df: pd.DataFrame) -> None:
@@ -268,6 +275,56 @@ def _render_feature_relation(df: pd.DataFrame) -> None:
     _render_sampling_note(len(df), len(plot_df))
 
 
+def _render_worst_properties(df: pd.DataFrame) -> None:
+    """残差が大きい順のワースト物件テーブル（N-3）を描画する."""
+    st.subheader("ワースト物件")
+    col_sort, col_n = st.columns([1, 1])
+    sort_label = col_sort.selectbox(
+        "ソート基準",
+        ["残差(絶対値)", "APE"],
+        key="worst_sort",
+    )
+    n = col_n.slider("表示件数", min_value=10, max_value=200, value=50, step=10, key="worst_n")
+
+    sort_by = "abs_error" if sort_label == "残差(絶対値)" else "ape"
+    table = worst_properties(df, sort_by=sort_by, n=n).copy()
+
+    # 行政区コードを名称に置換して可読性を上げる
+    name_by_code = _municipality_names()
+    table["市区町村コード"] = table["市区町村コード"].map(
+        lambda code: code_to_label(code, name_by_code)
+    )
+    table = table.rename(columns={"市区町村コード": "行政区"})
+
+    st.dataframe(table, use_container_width=True, hide_index=True)
+
+
+def _render_download_section(
+    filtered: pd.DataFrame, ward_summary: pd.DataFrame, station_summary: pd.DataFrame
+) -> None:
+    """フィルタ後データ・行政区集計・駅集計をCSVダウンロード可能にする（N-2）."""
+    with st.expander("ダウンロード"):
+        col1, col2, col3 = st.columns(3)
+        col1.download_button(
+            "フィルタ後データ(CSV)",
+            data=_to_csv_bytes(filtered),
+            file_name="filtered_predictions.csv",
+            mime="text/csv",
+        )
+        col2.download_button(
+            "行政区集計(CSV)",
+            data=_to_csv_bytes(ward_summary),
+            file_name="ward_summary.csv",
+            mime="text/csv",
+        )
+        col3.download_button(
+            "駅集計(CSV)",
+            data=_to_csv_bytes(station_summary),
+            file_name="station_summary.csv",
+            mime="text/csv",
+        )
+
+
 def main() -> None:
     """ページのエントリポイント."""
     st.title("予測結果 BIダッシュボード")
@@ -281,8 +338,13 @@ def main() -> None:
         return
 
     _render_kpis(filtered)
+    _render_download_section(
+        filtered, _aggregate_ward_cached(filtered), _aggregate_station_cached(filtered)
+    )
 
-    tab_accuracy, tab_area, tab_feature = st.tabs(["予測精度", "エリア別", "特徴量"])
+    tab_accuracy, tab_area, tab_feature, tab_worst = st.tabs(
+        ["予測精度", "エリア別", "特徴量", "ワースト物件"]
+    )
     with tab_accuracy:
         _render_scatter(filtered)
         _render_error_distribution(filtered)
@@ -292,6 +354,8 @@ def main() -> None:
         _render_ranking(filtered, by_station=True)
     with tab_feature:
         _render_feature_relation(filtered)
+    with tab_worst:
+        _render_worst_properties(filtered)
 
 
 main()

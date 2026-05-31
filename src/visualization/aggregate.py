@@ -219,6 +219,50 @@ def station_map_summary(df: pd.DataFrame) -> pd.DataFrame:
     return agg.merge(representative, on=STATION_COL, how="left")
 
 
+def worst_properties(
+    df: pd.DataFrame,
+    *,
+    sort_by: str = "abs_error",
+    n: int = 50,
+) -> pd.DataFrame:
+    """残差が大きい順に上位 N 件の物件を返す（ワースト物件テーブル用）.
+
+    Args:
+        df: 予測結果のデータフレーム。
+        sort_by: 並べ替えキー。``"abs_error"``（残差の絶対値、降順）または
+            ``"ape"``（APE、降順）。
+        n: 返す件数。``len(df)`` より大きい場合は全件返す。
+
+    Returns:
+        表示に必要な列だけを抽出した上位 N 件のデータフレーム
+        （``種類`` / ``市区町村コード`` / ``最寄駅：名称`` / ``面積（㎡）`` /
+        ``築年数`` / ``actual_price_yen`` / ``pred_price_yen`` / ``error_yen`` /
+        ``ape_percent``）。
+
+    Raises:
+        ValueError: ``sort_by`` が未対応の値の場合。
+    """
+    sort_column_map = {"abs_error": "_abs_error", "ape": APE_COL}
+    if sort_by not in sort_column_map:
+        raise ValueError(f"未対応のソート列: {sort_by}（'abs_error' / 'ape' のみ）")
+
+    work = df.copy()
+    work["_abs_error"] = work[ERROR_YEN_COL].abs()
+
+    display_cols = [
+        TYPE_COL,
+        WARD_CODE_COL,
+        STATION_COL,
+        AREA_COL,
+        AGE_COL,
+        ACTUAL_PRICE_COL,
+        PRED_PRICE_COL,
+        ERROR_YEN_COL,
+        APE_COL,
+    ]
+    return work.nlargest(n, sort_column_map[sort_by])[display_cols].reset_index(drop=True)
+
+
 def ward_map_summary(df: pd.DataFrame) -> pd.DataFrame:
     """コロプレス地図ポップアップ用に、行政区単位の集計へ代表値を付与する.
 
