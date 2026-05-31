@@ -37,6 +37,11 @@ from src.utils.logger import get_logger  # noqa: E402
 _TARGET_COLUMN = "取引価格（総額）"
 _LOG_TARGET_COLUMN = "log_取引価格"
 
+# 学習側の外れ値処理: 高額物件の影響で MAE/RMSE が膨らむため、学習・検証データの
+# 目的変数のみ上限値で頭打ち（winsorize）にする。test は素のまま評価する。
+_TRAIN_PRICE_CAP_YEN = 3e8
+_TRAIN_LOG_PRICE_CAP = float(np.log(_TRAIN_PRICE_CAP_YEN))
+
 # モデル保存設定
 _MODEL_DIR = _PROJECT_ROOT / "models"
 _MODEL_DIR.mkdir(parents=True, exist_ok=True)
@@ -200,6 +205,8 @@ def prepare_dataset() -> tuple[pd.DataFrame, pd.DataFrame, pd.Series]:
     """前処理・特徴量エンジニアリングを実行し、元データ・特徴量X・目的変数yを返す.
 
     目的変数は log 変換する。取引価格列はリーク防止のため X から除外する。
+    学習側だけの外れ値クリップは ``main()`` の train_test_split 後に行うため、
+    本関数では行わない（test 側を素のまま評価できるようにするため）。
 
     Returns:
         (df, X, y) のタプル。df は目的変数を含む元データ、y は log 変換済みの取引価格。
@@ -259,6 +266,17 @@ def main() -> None:
         x_train_full, y_train_full, test_size=val_ratio, random_state=42
     )
     logger.info(f"データ分割: train={len(x_train):,}, val={len(x_val):,}, test={len(x_test):,}")
+
+    # 学習・検証データの目的変数のみ上限値で頭打ちにする（test は素のまま評価）
+    # 高額物件の極端な外れ値で MAE/RMSE が引きずられる問題への対処
+    n_clipped_train = int((y_train > _TRAIN_LOG_PRICE_CAP).sum())
+    n_clipped_val = int((y_val > _TRAIN_LOG_PRICE_CAP).sum())
+    y_train = y_train.clip(upper=_TRAIN_LOG_PRICE_CAP)
+    y_val = y_val.clip(upper=_TRAIN_LOG_PRICE_CAP)
+    logger.info(
+        f"学習側クリップ（上限={_TRAIN_PRICE_CAP_YEN / 1e8:.1f}億円）: "
+        f"train={n_clipped_train}件, val={n_clipped_val}件を頭打ち（test は無修正）"
+    )
 
     # Optuna でハイパーパラメータをチューニング
     optuna.logging.set_verbosity(optuna.logging.WARNING)
