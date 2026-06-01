@@ -37,10 +37,12 @@ from src.utils.logger import get_logger  # noqa: E402
 _TARGET_COLUMN = "取引価格（総額）"
 _LOG_TARGET_COLUMN = "log_取引価格"
 
-# 学習側の外れ値処理: 高額物件の影響で MAE/RMSE が膨らむため、学習・検証データの
-# 目的変数のみ上限値で頭打ち（winsorize）にする。test は素のまま評価する。
-_TRAIN_PRICE_CAP_YEN = 3e8
-_TRAIN_LOG_PRICE_CAP = float(np.log(_TRAIN_PRICE_CAP_YEN))
+# 学習時のサンプル重み付け: 価格帯ごとに合計重みが等しくなるよう調整し、
+# 件数の少ない高額帯/低額帯のモデル学習への寄与度を引き上げる。test は重みなしで評価。
+# bins は `actual_price_band` と同じ区切りを採用（~2000万/2000万~5000万/5000万~1億/1億~3億/3億~）。
+_WEIGHT_PRICE_BINS = np.array([0.0, 2e7, 5e7, 1e8, 3e8, np.inf])
+# 一部サンプルの重みが過大になり過学習しないよう、平均1.0を基準に上限を10倍までに抑える
+_WEIGHT_CAP = 10.0
 
 # モデル保存設定
 _MODEL_DIR = _PROJECT_ROOT / "models"
@@ -53,6 +55,43 @@ _PREDICTION_ANALYSIS_PATH = _OUTPUT_DIR / "test_predictions.csv"
 
 # ロガーの初期化
 logger = get_logger(__name__)
+
+
+def compute_band_uniform_weights(
+    y_log: pd.Series,
+    *,
+    bins: np.ndarray = _WEIGHT_PRICE_BINS,
+    weight_cap: float = _WEIGHT_CAP,
+) -> np.ndarray:
+    """価格帯ごとに合計重みが等しくなるサンプル重みを計算する.
+
+    各帯に属するサンプルの重み合計を ``n / n_bands`` で揃え、件数の少ない帯ほど
+    1サンプルあたりの重みが大きくなるようにする（クラス不均衡補正の連続版）。
+    重みの平均は 1.0 になるよう正規化し、必要に応じて上限クリップで過学習を防ぐ。
+
+    Args:
+        y_log: ``log`` 変換後の目的変数（円スケールに復元して帯を判定する）。
+        bins: 価格帯の境界値（円）。
+        weight_cap: 1サンプルあたり重みの上限（``> 0`` でクリップ）。
+
+    Returns:
+        ``y_log`` と同じ長さのサンプル重み配列。平均≈1.0。
+    """
+    price_yen = np.exp(np.asarray(y_log, dtype=float))
+    n_bands = len(bins) - 1
+    band_idx = np.digitize(price_yen, bins) - 1
+    # 端点の処理: ビン範囲外（負・無限大）は前後の有効帯に丸める
+    band_idx = np.clip(band_idx, 0, n_bands - 1)
+    counts = np.bincount(band_idx, minlength=n_bands)
+
+    n = len(price_yen)
+    # 各帯の合計重み = n / n_bands となるよう、1サンプル分は n / (n_bands * count_b)
+    weights = n / (n_bands * counts[band_idx])
+    if weight_cap > 0:
+        weights = np.minimum(weights, weight_cap)
+        # 上限クリップで失われた重み量を全体で再正規化（平均≈1.0 を維持）
+        weights *= len(weights) / weights.sum()
+    return weights.astype(float)
 
 
 def suggest_params(
@@ -85,8 +124,10 @@ def objective(
     trial: optuna.Trial,
     x_train: pd.DataFrame,
     y_train: pd.Series,
+    w_train: np.ndarray,
     x_val: pd.DataFrame,
     y_val: pd.Series,
+    w_val: np.ndarray,
     search_space: dict[str, dict[str, Any]],
     fixed_params: dict[str, Any],
 ) -> float:
@@ -94,13 +135,13 @@ def objective(
 
     Args:
         trial: Optunaのトライアル。
-        x_train, y_train: 学習データ。
-        x_val, y_val: 検証データ。
+        x_train, y_train, w_train: 学習データと学習用サンプル重み。
+        x_val, y_val, w_val: 検証データと検証用サンプル重み。
         search_space: 探索範囲の定義。
         fixed_params: 固定パラメータ。
 
     Returns:
-        検証セットのRMSE（logスケール）。
+        検証セットのRMSE（logスケール、重みなし）。
     """
     params = suggest_params(trial, search_space, fixed_params)
     model = LGBMRegressor(**params)
@@ -109,10 +150,13 @@ def objective(
     model.fit(
         x_train,
         y_train,
+        sample_weight=w_train,
         eval_set=[(x_val, y_val)],
+        eval_sample_weight=[w_val],
         callbacks=[lgb.early_stopping(50, verbose=False), pruning_callback],
     )
     y_pred = model.predict(x_val)
+    # Optuna の最終目的値は重みなしの RMSE で評価する（公平比較のため）
     return float(np.sqrt(mean_squared_error(y_val, y_pred)))
 
 
@@ -267,15 +311,15 @@ def main() -> None:
     )
     logger.info(f"データ分割: train={len(x_train):,}, val={len(x_val):,}, test={len(x_test):,}")
 
-    # 学習・検証データの目的変数のみ上限値で頭打ちにする（test は素のまま評価）
-    # 高額物件の極端な外れ値で MAE/RMSE が引きずられる問題への対処
-    n_clipped_train = int((y_train > _TRAIN_LOG_PRICE_CAP).sum())
-    n_clipped_val = int((y_val > _TRAIN_LOG_PRICE_CAP).sum())
-    y_train = y_train.clip(upper=_TRAIN_LOG_PRICE_CAP)
-    y_val = y_val.clip(upper=_TRAIN_LOG_PRICE_CAP)
+    # 学習・検証データに価格帯均等化のサンプル重みを適用（test は重みなしで評価）
+    # 件数の少ない高額/低額帯のモデル学習への寄与を引き上げ、外れ値の影響をサンプル
+    # 除去ではなく重みで抑える方向の介入（EXP-005 のクリップ案を置き換える）
+    w_train = compute_band_uniform_weights(y_train)
+    w_val = compute_band_uniform_weights(y_val)
     logger.info(
-        f"学習側クリップ（上限={_TRAIN_PRICE_CAP_YEN / 1e8:.1f}億円）: "
-        f"train={n_clipped_train}件, val={n_clipped_val}件を頭打ち（test は無修正）"
+        f"サンプル重み（価格帯均等化, cap={_WEIGHT_CAP}）: "
+        f"train min={w_train.min():.3f} mean={w_train.mean():.3f} max={w_train.max():.3f} / "
+        f"val min={w_val.min():.3f} mean={w_val.mean():.3f} max={w_val.max():.3f}"
     )
 
     # Optuna でハイパーパラメータをチューニング
@@ -287,19 +331,23 @@ def main() -> None:
         pruner=optuna.pruners.MedianPruner(n_warmup_steps=20),
     )
     study.optimize(
-        lambda trial: objective(trial, x_train, y_train, x_val, y_val, search_space, fixed_params),
+        lambda trial: objective(
+            trial, x_train, y_train, w_train, x_val, y_val, w_val, search_space, fixed_params
+        ),
         n_trials=optuna_config["n_trials"],
     )
     logger.info(f"Optuna 完了: best RMSE_log={study.best_value:.4f}")
     logger.info(f"best_params={study.best_params}")
 
-    # 最良パラメータで最終モデルを学習
+    # 最良パラメータで最終モデルを学習（学習時のみ重み付け、評価時は重みなし）
     best_params = {**fixed_params, **study.best_params}
     final_model = LGBMRegressor(**best_params)
     final_model.fit(
         x_train,
         y_train,
+        sample_weight=w_train,
         eval_set=[(x_val, y_val)],
+        eval_sample_weight=[w_val],
         callbacks=[lgb.early_stopping(50, verbose=False)],
     )
 
