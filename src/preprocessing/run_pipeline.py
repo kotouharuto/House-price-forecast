@@ -53,13 +53,13 @@ def run_pipeline(raw_path: Path = _RAW_DATA_PATH, output_path: Path = _OUTPUT_PA
     logger.info("=== パイプライン完了 ===")
 
     # 動作確認用のサマリをコンソールに出力
-    print("\n=== パイプライン実行結果 ===")
-    print(f"出力ファイル: {output_path}")
-    print(f"行数 x 列数: {df.shape}")
-    print("\n--- 列名と型 ---")
-    print(df.dtypes.to_string())
-    print("\n--- 欠損数（上位10列） ---")
-    print(df.isna().sum().sort_values(ascending=False).head(10).to_string())
+    logger.info("\n=== パイプライン実行結果 ===")
+    logger.info(f"出力ファイル: {output_path}")
+    logger.info(f"行数 x 列数: {df.shape}")
+    logger.info("\n--- 列名と型 ---")
+    logger.info(df.dtypes.to_string())
+    logger.info("\n--- 欠損数（上位10列） ---")
+    logger.info(df.isna().sum().sort_values(ascending=False).head(10).to_string())
 
     return df
 
