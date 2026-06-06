@@ -32,6 +32,15 @@ _EARTH_RADIUS_KM = 6371
 _YAMANOTE_LAT_RANGE = (35.628, 35.738)
 _YAMANOTE_LON_RANGE = (139.700, 139.780)
 
+# 都心主要ターミナル駅の緯度経度（直線距離特徴量の計算基準点）
+_MAJOR_HUBS: dict[str, tuple[float, float]] = {
+    "新宿": (35.690921, 139.700258),
+    "渋谷": (35.658517, 139.701334),
+    "池袋": (35.728926, 139.710999),
+    "東京": (35.681236, 139.767125),
+    "品川": (35.628471, 139.738760),
+}
+
 # ロガーの初期化
 logger = get_logger(__name__)
 
@@ -95,6 +104,14 @@ def merge_station_data(df: pd.DataFrame) -> pd.DataFrame:
         }
     )
 
+    # 乗り入れ路線数を station_g_cd（駅グループ）単位で集計して駅マスタに付与
+    line_count = (
+        station_df.groupby("station_g_cd")["line_cd"]
+        .nunique()
+        .rename("乗り入れ路線数")
+    )
+    station_df = station_df.merge(line_count, on="station_g_cd", how="left")
+
     # 同名駅が複数路線にまたがるため重複を除去（先頭の1行を残す）
     station_df = station_df.drop_duplicates(subset=["最寄駅：名称"], keep="first")
 
@@ -104,14 +121,18 @@ def merge_station_data(df: pd.DataFrame) -> pd.DataFrame:
         df["最寄駅：名称"].astype(str).str.replace(r"\([^)]*\)", "", regex=True).str.strip()
     )
 
-    # 必要な3列のみに絞ってから merge（不要な列が混入するのを防ぐ）
+    # 必要な4列のみに絞ってから merge（不要な列が混入するのを防ぐ）
     df = df.merge(
-        station_df[["最寄駅：名称", "最寄駅：緯度", "最寄駅：経度"]],
+        station_df[["最寄駅：名称", "最寄駅：緯度", "最寄駅：経度", "乗り入れ路線数"]],
         on="最寄駅：名称",
         how="left",
     )
     n_missing = int(df["最寄駅：緯度"].isna().sum())
-    logger.info(f"Merged station data. Missing coordinates after merge: {n_missing:,} rows.")
+    n_missing_lines = int(df["乗り入れ路線数"].isna().sum())
+    logger.info(
+        f"Merged station data. Missing coordinates: {n_missing:,} rows, "
+        f"Missing line count: {n_missing_lines:,} rows."
+    )
 
     return df
 
@@ -365,21 +386,22 @@ def generate_features(df: pd.DataFrame) -> pd.DataFrame:
         df["築年数^2"] = df["築年数"] ** 2
         logger.info("Generated '築年数^2' feature by squaring the '築年数' column.")
 
-    # 中心地からの距離
+    # 都心主要ターミナル駅への直線距離
     if {"最寄駅：緯度", "最寄駅：経度"}.issubset(df.columns):
-        # 東京駅の緯度経度（中心地の代表点として）
-        tokyo_lat, tokyo_lon = 35.681236, 139.767125
+        lat = pd.to_numeric(df["最寄駅：緯度"], errors="coerce")
+        lon = pd.to_numeric(df["最寄駅：経度"], errors="coerce")
+        valid_mask = lat.notna() & lon.notna()
 
-        df["中心地_距離"] = df.apply(
-            lambda row: (
-                haversine(row["最寄駅：緯度"], row["最寄駅：経度"], tokyo_lat, tokyo_lon)
-                if pd.notnull(row["最寄駅：緯度"]) and pd.notnull(row["最寄駅：経度"])
-                else np.nan
-            ),
-            axis=1,
-        )
+        for hub_name, (hub_lat, hub_lon) in _MAJOR_HUBS.items():
+            col = f"{hub_name}_距離"
+            df[col] = np.where(
+                valid_mask,
+                np.vectorize(haversine)(lat, lon, hub_lat, hub_lon),
+                np.nan,
+            )
+
         logger.info(
-            "Generated '中心地_距離' feature by calculating Haversine distance to Tokyo Station."
+            f"Generated hub distance features for: {list(_MAJOR_HUBS.keys())}."
         )
 
     # 山手線の内側かどうかを判定
@@ -407,7 +429,6 @@ def generate_features(df: pd.DataFrame) -> pd.DataFrame:
         df["容積距離"] = df["容積率（％）"] * df["最寄駅：距離（分）"]
         logger.info("Added 容積距離 in dataframe")
 
-    # 低額帯(~2000万円未満)の特徴量強化
     
 
     return df
