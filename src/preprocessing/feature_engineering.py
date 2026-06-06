@@ -407,8 +407,53 @@ def generate_features(df: pd.DataFrame) -> pd.DataFrame:
         df["容積距離"] = df["容積率（％）"] * df["最寄駅：距離（分）"]
         logger.info("Added 容積距離 in dataframe")
 
-    # 低額帯(~2000万円未満)の特徴量強化
-    
+    """低額帯(~2000万円未満)の特徴量強化"""
+
+    # === 面積、間取り系の特徴 ===
+    # if {"築年数", "log_面積"}.issubset(df.columns):
+    #     df["築年数_log_面積"] = df["築年数"] * df["log_面積"]
+    #     logger.info("Added 築年数_log_面積 interaction feature for low-price properties.")
+
+    # if {"築年数", "面積（㎡）", "has_L", "has_K"}.issubset(df.columns):
+    #     df["is_old_one_room"] = ((df["築年数"] >= 35) & (df["面積（㎡）"] <= 25) & (df["has_L"] == 0))
+    #     logger.info("Added is_old_one_room flag for properties likely to be old one-room apartments.")
+
+    #     df["is_old_1K"] = ((df["築年数"] >= 35) & (df["面積（㎡）"] <= 30) & (df["has_K"] == 1))
+    #     logger.info("Added is_old_1K flag for properties likely to be old 1K apartments.")
+
+    # if {"面積（㎡）", "room_count"}.issubset(df.columns):
+    #     df["area_per_room"] = df["面積（㎡）"] / df["room_count"].clip(lower=1)
+    #     logger.info("Added area_per_room feature by dividing '面積（㎡）' by 'room_count'.")
+
+    # if {"has_L", "面積（㎡）"}.issubset(df.columns):
+    #     df["has_L_area"] = df["has_L"] * df["面積（㎡）"]
+    #     logger.info("Added has_L_area feature by multiplying 'has_L' with '面積（㎡）'.")
+
+    # === 建物の構造系の特徴 ===
+    # if {"築年数", "建物の構造"}.issubset(df.columns):
+    #     is_concreate = df["建物の構造"].isin({"RC", "SRC", "SRC、RC"})
+    #     is_steel = df["建物の構造"].isin({"鉄骨造", "SRC、鉄骨造"})
+    #     is_wood = df["建物の構造"].eq("木造")
+
+    #     df["築年数_鉄筋"] = df["築年数"] * is_concreate.astype(int)
+    #     df["築年数_鉄骨"] = df["築年数"] * is_steel.astype(int)
+    #     df["築年数_木造"] = df["築年数"] * is_wood.astype(int)
+
+    #     logger.info("Added 築年数 * 建物の構造.")
+
+    # if {"築年数", "最寄駅：距離（分）"}.issubset(df.columns):
+    #     df["築年_駅距離"] = df["築年数"] * df["最寄駅：距離（分）"]
+    #     logger.info("Added 築年_駅距離.")
+
+    if {"面積（㎡）"}.issubset(df.columns):
+    #     df["area_category"] = pd.cut(
+    #         df["面積（㎡）"], bins=[0, 20, 30, 50, 70, 90, np.inf],
+    #         labels=["0-20", "20-30", "30-50", "50-70", "70-90", "90+"]
+    #     )
+    #     logger.info("Added 'area_category'.")
+
+        df["is_low_area"] = df["面積（㎡）"] < 20
+        logger.info("Added 'is_low_area'.")
 
     return df
 
