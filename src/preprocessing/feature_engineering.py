@@ -407,6 +407,9 @@ def generate_features(df: pd.DataFrame) -> pd.DataFrame:
         df["容積距離"] = df["容積率（％）"] * df["最寄駅：距離（分）"]
         logger.info("Added 容積距離 in dataframe")
 
+    # 低額帯(~2000万円未満)の特徴量強化
+    
+
     return df
 
 

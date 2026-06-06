@@ -48,6 +48,7 @@ data/raw/
 data/processed/
 models/*.pkl
 models/*.joblib
+output/
 
 # 環境
 .venv/
