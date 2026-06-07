@@ -169,9 +169,22 @@ uv run pytest --cov=src --cov-report=term-missing
 ```
 
 ### Streamlit アプリ起動
+
+本アプリは Streamlit のマルチページ構成です。エントリは `app/streamlit_app.py`、
+予測結果を可視化する **BIダッシュボード** は `app/pages/1_BIダッシュボード.py` にあります。
+
 ```bash
+# マルチページとして起動（サイドバーからページを選択）
 uv run streamlit run app/streamlit_app.py
+
+# BIダッシュボードを直接開く
+uv run streamlit run "app/pages/1_BIダッシュボード.py"
 ```
+
+起動するとブラウザで `http://localhost:8501` が開きます。
+
+> **前提:** BIダッシュボードは予測結果 `outputs/test_predictions.csv` を読み込みます。
+> 未生成の場合は先にモデルの学習・評価を実行して CSV を出力してください。
 
 ### 依存関係の追加・削除
 ```bash

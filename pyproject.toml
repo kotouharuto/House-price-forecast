@@ -21,6 +21,10 @@ dependencies = [
     "matplotlib-fontja",
     "optuna>=4.8.0",
     "pyyaml>=6.0.3",
+    "optuna-integration[lightgbm]",
+    "mypy>=2.0.0",
+    "folium>=0.20.0",
+    "streamlit-folium>=0.27.2",
 ]
 
 [build-system]
@@ -37,6 +41,7 @@ dev = [
     "ruff>=0.15.12",
     "pytest>=8.0",
     "mypy>=1.10",
+    "types-pyyaml",
 ]
 
 # =============================================================================
@@ -76,3 +81,11 @@ ignore = [
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+
+# =============================================================================
+# pytest 設定
+# =============================================================================
+[tool.pytest.ini_options]
+# プロジェクトルートを sys.path に追加し、テストから `src.xxx` を import 可能にする
+pythonpath = ["."]
+testpaths = ["tests"]

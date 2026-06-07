@@ -48,6 +48,7 @@ data/raw/
 data/processed/
 models/*.pkl
 models/*.joblib
+output/
 
 # 環境
 .venv/
@@ -61,6 +62,9 @@ logs/*.log.*
 
 # Jupyter
 .ipynb_checkpoints/
+
+# Playwright（ブラウザ検証時の一時成果物）
+.playwright-mcp/
 
 # IDE
 .vscode/
