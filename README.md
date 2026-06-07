@@ -279,7 +279,7 @@ uv run pytest
 - エリアごとの賃料分布
 
 ## 🖥️ デモ
-（Streamlit Cloudへデプロイ後にURLを追記）
+https://house-price-forecast-kdlsiz7aofshexpt3sulky.streamlit.app/
 
 ## 📝 関連記事
 （Zenn記事を書いた後にリンクを追記）
