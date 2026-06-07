@@ -3010,7 +3010,7 @@ requires-dist = [
     { name = "optuna-integration", extras = ["lightgbm"] },
     { name = "pandas" },
     { name = "plotly" },
-    { name = "pyyaml" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "requests" },
     { name = "scikit-learn" },
     { name = "seaborn" },

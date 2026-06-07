@@ -1,63 +1,39 @@
-# モデルのハイパーパラメータ定義
-# train.py から src.utils.config.load_model_params() 経由で読み込む。
-# セクション名（例: lgbm）= モデル種別。新しいモデルを追加する場合はセクションを増やす。
+# モデル学習の主要パラメータ
+# 変更時は実験管理表（docs/model_experiment_log.md）に EXP-ID を起こすこと。
+# 関連: docs/model_experiment_proposals.md (PROP-001 Huber 損失採用)
 
-# LightGBM 回帰モデル（取引価格の対数を予測）の固定パラメータ
-# Optunaで探索しない、全試行で共通のパラメータ
+# ---------- LightGBM 本体 ----------
 lgbm:
-  objective: huber       # 損失関数（L2 = MSE 最小化）
-  metric: rmse                # 検証指標
-  boosting_type: gbdt         # ブースティング種別
-  subsample_freq: 1           # サブサンプリングを行う頻度（反復ごと）
-  random_state: 42            # 再現性のための乱数シード
-  n_jobs: -1                  # 並列スレッド数（-1 = 全コア）
-  verbose: -1                 # ログ出力レベル（-1 = 抑制）
+  # 損失関数。huber は外れ値耐性を上げる（PROP-001 で採用）。
+  # 代替候補: regression (MSE), quantile (中央値推定)
+  objective: huber
 
-# Optuna が探索するハイパーパラメータの範囲
-# type: int / float、log: true で対数スケール探索
-lgbm_search_space:
-  n_estimators:
-    type: int
-    low: 100
-    high: 2000
-  learning_rate:
-    type: float
-    low: 0.01
-    high: 0.3
-    log: true
-  num_leaves:
-    type: int
-    low: 15
-    high: 255
-  max_depth:
-    type: int
-    low: 3
-    high: 12
-  min_child_samples:
-    type: int
-    low: 5
-    high: 100
-  subsample:
-    type: float
-    low: 0.6
-    high: 1.0
-  colsample_bytree:
-    type: float
-    low: 0.6
-    high: 1.0
-  reg_alpha:
-    type: float
-    low: 0.001
-    high: 10.0
-    log: true
-  reg_lambda:
-    type: float
-    low: 0.001
-    high: 10.0
-    log: true
+  # 内部評価指標
+  metric: rmse
 
-# Optuna・データ分割の設定
-optuna:
-  n_trials: 50      # Optuna の試行回数
-  test_size: 0.2    # テストデータの割合
-  val_size: 0.2     # 検証データの割合（全体に対する割合）
+  # 学習設定
+  n_estimators: 1000
+  learning_rate: 0.05
+  num_leaves: 31
+  min_child_samples: 20
+
+  # サンプリング
+  subsample: 0.8
+  subsample_freq: 1
+  colsample_bytree: 0.8
+
+  # 正則化
+  reg_alpha: 0.1
+  reg_lambda: 0.1
+
+  # 実行設定
+  random_state: 42
+  n_jobs: -1
+  verbose: -1
+
+# ---------- データ分割 ----------
+split:
+  # 全データのうち test に割く比率（scikit-learn の train_test_split デフォルトは 0.25）
+  test_size: 0.25
+  # 分割の再現性確保のための seed
+  random_state: 42
