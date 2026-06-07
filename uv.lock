@@ -249,6 +249,18 @@ wheels = [
 ]
 
 [[package]]
+name = "branca"
+version = "0.8.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "jinja2" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/32/14/9d409124bda3f4ab7af3802aba07181d1fd56aa96cc4b999faea6a27a0d2/branca-0.8.2.tar.gz", hash = "sha256:e5040f4c286e973658c27de9225c1a5a7356dd0702a7c8d84c0f0dfbde388fe7", size = 27890, upload-time = "2025-10-06T10:28:20.305Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7e/50/fc9680058e63161f2f63165b84c957a0df1415431104c408e8104a3a18ef/branca-0.8.2-py3-none-any.whl", hash = "sha256:2ebaef3983e3312733c1ae2b793b0a8ba3e1c4edeb7598e10328505280cf2f7c", size = 26193, upload-time = "2025-10-06T10:28:19.255Z" },
+]
+
+[[package]]
 name = "cachetools"
 version = "7.1.4"
 source = { registry = "https://pypi.org/simple" }
@@ -3043,6 +3055,7 @@ name = "tokyo-rent-predictor"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "branca" },
     { name = "huggingface-hub" },
     { name = "ipykernel" },
     { name = "jupyter" },
@@ -3072,6 +3085,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "branca", specifier = ">=0.8.2" },
     { name = "huggingface-hub", specifier = ">=1.18.0" },
     { name = "ipykernel" },
     { name = "jupyter" },
