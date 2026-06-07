@@ -32,7 +32,7 @@ flowchart TD
 
     subgraph APP["Streamlitアプリ (app/)"]
         direction LR
-        MAIN["streamlit_app.py<br/>予測ページ<br/>属性入力 → 価格予測"]
+        MAIN["home.py<br/>トップページ<br/>概要 / KPIサマリ / 各ページへの導線"]
         BI["1_BIダッシュボード.py<br/>予測結果可視化"]
     end
 

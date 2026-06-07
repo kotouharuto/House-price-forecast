@@ -57,7 +57,7 @@ tokyo-rent-predictor/
 │   ├── 02_feature_engineering.ipynb  # 特徴量設計の検討
 │   └── 03_modeling.ipynb       # モデリング実験
 ├── app/
-│   └── streamlit_app.py        # Streamlitアプリ
+│   └── home.py        # Streamlitアプリ
 ├── data/
 │   ├── raw/                    # 取得済みの生データ（.gitignore対象）
 │   └── processed/              # 前処理済みデータ（.gitignore対象）
@@ -170,12 +170,12 @@ uv run pytest --cov=src --cov-report=term-missing
 
 ### Streamlit アプリ起動
 
-本アプリは Streamlit のマルチページ構成です。エントリは `app/streamlit_app.py`、
+本アプリは Streamlit のマルチページ構成です。エントリは `app/home.py`、
 予測結果を可視化する **BIダッシュボード** は `app/pages/1_BIダッシュボード.py` にあります。
 
 ```bash
 # マルチページとして起動（サイドバーからページを選択）
-uv run streamlit run app/streamlit_app.py
+uv run streamlit run app/home.py
 
 # BIダッシュボードを直接開く
 uv run streamlit run "app/pages/1_BIダッシュボード.py"
@@ -210,7 +210,7 @@ uv sync --frozen
 | `uv run ruff format .` | コードフォーマット適用 |
 | `uv run mypy src/` | 型チェック |
 | `uv run pytest` | テスト実行 |
-| `uv run streamlit run app/streamlit_app.py` | アプリ起動 |
+| `uv run streamlit run app/home.py` | アプリ起動 |
 
 ---
 

@@ -408,7 +408,7 @@ def generate_features(df: pd.DataFrame) -> pd.DataFrame:
         logger.info("Added 容積距離 in dataframe")
 
     # 低額帯(~2000万円未満)の特徴量強化
-    
+
 
     return df
 

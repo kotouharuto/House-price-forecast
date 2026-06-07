@@ -212,7 +212,7 @@ uv run pytest tests/test_aggregate.py tests/test_master.py tests/test_format.py
 可能なら手動でStreamlitも確認する。
 
 ```bash
-uv run streamlit run app/streamlit_app.py
+uv run streamlit run app/home.py
 ```
 
 確認観点:

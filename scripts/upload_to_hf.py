@@ -7,7 +7,6 @@
     huggingface-cli login  # HF_TOKEN を設定
 """
 
-import sys
 from pathlib import Path
 
 from huggingface_hub import HfApi, create_repo
