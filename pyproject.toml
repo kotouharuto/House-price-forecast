@@ -23,6 +23,7 @@ dependencies = [
     "pyyaml>=6.0.3",
     "huggingface-hub>=1.18.0",
     "branca>=0.8.2",
+    "folium>=0.20.0",
 ]
 
 [build-system]
