@@ -426,3 +426,60 @@ def summarize_metrics(df: pd.DataFrame) -> dict[str, float]:
         "mape": float(np.mean(ape)),
         "median_ape": float(np.median(ape)),
     }
+
+
+# 業界 AVM（NAVAR/IAAO 等）でよく使われる PE しきい値（%）
+DEFAULT_PE_THRESHOLDS: tuple[int, ...] = (10, 20, 30, 50)
+
+
+def percent_error_rates(
+    df: pd.DataFrame,
+    thresholds: tuple[int, ...] = DEFAULT_PE_THRESHOLDS,
+) -> dict[str, float]:
+    """APE がしきい値以下の物件比率（PE10/PE20/...）を算出する.
+
+    業界 AVM ベンチマーク（NAVAR/IAAO 等）で参照される指標。
+    例: ``PE10 = APE が 10% 以下の物件比率 (%)``。
+
+    Args:
+        df: 予測結果のデータフレーム。``ape_percent`` 列を含むこと。
+        thresholds: しきい値のタプル（%単位）。
+
+    Returns:
+        ``{"PE10": float, "PE20": float, ...}`` の辞書（単位は %）。
+        空データフレームでは各値 NaN を返す。
+    """
+    if len(df) == 0:
+        return {f"PE{t}": float("nan") for t in thresholds}
+
+    ape = df[APE_COL].to_numpy(dtype=float)
+    return {f"PE{t}": float((ape <= t).mean() * 100) for t in thresholds}
+
+
+def metrics_by_price_band(df: pd.DataFrame) -> pd.DataFrame:
+    """価格帯別の評価指標（件数・Median APE・MAPE・PE10/PE20）を算出する.
+
+    `actual_price_band` 列でグルーピングし、業務 KPI として実用的な指標を返す。
+
+    Args:
+        df: 予測結果のデータフレーム。
+
+    Returns:
+        価格帯ごとの ``count``, ``median_ape``, ``mape``, ``pe10``, ``pe20`` を
+        持つデータフレーム（``actual_price_band`` を1列目に含む）。
+    """
+    if len(df) == 0 or PRICE_BAND_COL not in df.columns:
+        return pd.DataFrame(columns=[PRICE_BAND_COL, "count", "median_ape", "mape", "pe10", "pe20"])
+
+    result = (
+        df.groupby(PRICE_BAND_COL, observed=True)
+        .agg(
+            count=(APE_COL, "size"),
+            median_ape=(APE_COL, "median"),
+            mape=(APE_COL, "mean"),
+            pe10=(APE_COL, lambda s: float((s <= 10).mean() * 100)),
+            pe20=(APE_COL, lambda s: float((s <= 20).mean() * 100)),
+        )
+        .reset_index()
+    )
+    return result

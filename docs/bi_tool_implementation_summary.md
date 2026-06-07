@@ -159,7 +159,7 @@ Streamlit のページ層（`app/pages/`）はその上に立つ薄いUIとし�
 
 | 項目 | 決定 |
 |---|---|
-| アプリ構成 | Streamlit マルチページ。エントリは `app/streamlit_app.py`、コンテンツは `app/pages/` |
+| アプリ構成 | Streamlit マルチページ。エントリは `app/home.py`、コンテンツは `app/pages/` |
 | ロジックとUIの分離 | 集計・ローディングは `src/visualization/`、UIは `app/` |
 | ページ間の共通化 | フィルタは `app/filters.py` の `render_sidebar_filters` に一本化（DRY） |
 | ページ間の状態共有 | フィルタウィジェットに明示キー（`flt_*`）を付与し、Streamlit の session_state で共有 |
@@ -202,14 +202,14 @@ Streamlit のページ層（`app/pages/`）はその上に立つ薄いUIとし�
 
 ### アプリ起動
 ```
-uv run streamlit run app/streamlit_app.py
+uv run streamlit run app/home.py
 ```
 サイドバーから「BIダッシュボード」「地図」のページを切替。
 
 ### 別モデルの予測結果を表示
 ```
 BI_PREDICTIONS_PATH=/path/to/other_predictions.csv \
-  uv run streamlit run app/streamlit_app.py
+  uv run streamlit run app/home.py
 ```
 
 ### CSV→GeoJSON 変換

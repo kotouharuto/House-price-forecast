@@ -27,7 +27,7 @@
 - `outputs/figures/`: 可視化画像
 
 ## よく使うコマンド
-- `uv run streamlit run app/streamlit_app.py` - アプリ起動
+- `uv run streamlit run app/home.py` - アプリ起動
 - `uv run pytest` - テスト
 - `uv run ruff check . --fix` - Lint修正
 

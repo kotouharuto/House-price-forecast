@@ -15,6 +15,8 @@ from src.visualization.aggregate import (
     default_predictions_path,
     filter_predictions,
     load_predictions,
+    metrics_by_price_band,
+    percent_error_rates,
     price_band_order,
     station_map_summary,
     summarize_metrics,
@@ -351,3 +353,54 @@ def test_summarize_metrics_empty_returns_zero_count() -> None:
     assert metrics["count"] == 0
     assert math.isnan(metrics["mae_yen"])
     assert math.isnan(metrics["mape"])
+
+
+def test_percent_error_rates_computes_thresholds() -> None:
+    """指定しきい値ごとに APE 以下の物件比率（%）を返すこと."""
+    # _sample_df の ape = [10.0, 20.0, 30.0]
+    rates = percent_error_rates(_sample_df(), thresholds=(10, 20, 30))
+
+    # PE10: ape<=10 は 10.0 の1件 → 1/3 ≈ 33.33%
+    assert rates["PE10"] == pytest.approx(100 / 3)
+    # PE20: ape<=20 は 10.0, 20.0 の2件 → 2/3 ≈ 66.67%
+    assert rates["PE20"] == pytest.approx(200 / 3)
+    # PE30: 3件すべて → 100%
+    assert rates["PE30"] == 100.0
+
+
+def test_percent_error_rates_default_thresholds() -> None:
+    """既定の閾値（10/20/30/50）でキーが揃うこと."""
+    rates = percent_error_rates(_sample_df())
+
+    assert set(rates.keys()) == {"PE10", "PE20", "PE30", "PE50"}
+
+
+def test_percent_error_rates_empty_returns_nan() -> None:
+    """空データでは各しきい値で NaN を返すこと."""
+    rates = percent_error_rates(_sample_df().iloc[0:0])
+
+    assert all(math.isnan(v) for v in rates.values())
+
+
+def test_metrics_by_price_band_returns_per_band_stats() -> None:
+    """価格帯別に件数・Median APE・MAPE・PE10/PE20 を返すこと."""
+    result = metrics_by_price_band(_sample_df()).set_index("actual_price_band")
+
+    # 1000万~5000万: 2件 (ape=10.0, 20.0)、5000万~1億: 1件 (ape=30.0)
+    assert {"count", "median_ape", "mape", "pe10", "pe20"}.issubset(result.columns)
+    assert result.loc["1000万~5000万", "count"] == 2
+    assert result.loc["1000万~5000万", "median_ape"] == pytest.approx(15.0)
+    assert result.loc["1000万~5000万", "mape"] == pytest.approx(15.0)
+    # PE10: ape<=10 の比率 (10.0 のみ→1/2=50%)
+    assert result.loc["1000万~5000万", "pe10"] == pytest.approx(50.0)
+    # PE20: ape<=20 の比率 (両方→100%)
+    assert result.loc["1000万~5000万", "pe20"] == pytest.approx(100.0)
+
+
+def test_metrics_by_price_band_empty_returns_empty_df() -> None:
+    """空データでは列だけの空 DataFrame を返すこと."""
+    empty = _sample_df().iloc[0:0]
+    result = metrics_by_price_band(empty)
+
+    assert len(result) == 0
+    assert {"count", "median_ape", "mape", "pe10", "pe20"}.issubset(result.columns)
