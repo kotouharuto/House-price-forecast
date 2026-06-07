@@ -47,15 +47,30 @@ _DOWNLOAD_FILES: list[tuple[str, Path]] = [
 ]
 
 
+def _get_hf_token() -> str | None:
+    """Streamlit Secrets から HF_TOKEN を取得する（無ければ None）.
+
+    ローカル開発環境では ``.streamlit/secrets.toml`` が無い・無設定でも動くよう、
+    例外を握りつぶして匿名アクセス（``token=None``）にフォールバックする。
+    """
+    try:
+        return st.secrets["HF_TOKEN"]
+    except (FileNotFoundError, KeyError, AttributeError):
+        return None
+
+
 @st.cache_resource(show_spinner="データを準備しています...")
 def _download_assets() -> None:
     """HuggingFace Hub から必要なファイルをダウンロードする.
 
+    Private リポジトリの場合は Streamlit Secrets の ``HF_TOKEN`` を利用する。
     既にローカルに存在する場合はスキップする（ローカル開発環境への配慮）。
     """
     import shutil
 
     from huggingface_hub import hf_hub_download
+
+    token = _get_hf_token()
 
     for hf_path, local_path in _DOWNLOAD_FILES:
         if local_path.exists():
@@ -67,6 +82,7 @@ def _download_assets() -> None:
             filename=hf_path,
             repo_type="dataset",
             local_dir=str(_PROJECT_ROOT),
+            token=token,
         )
         # hf_hub_download はキャッシュディレクトリに置くため、指定パスへコピー
         if Path(downloaded) != local_path:
