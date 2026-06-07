@@ -5,7 +5,8 @@
       "Bash(echo \"=== APIキー漏洩チェック（~/.zshrc 内に残っていないか）===\" && grep -n -i \"api_key\\\\|sk-ant\\\\|KAGGLE_KEY=\" ~/.zshrc || echo \"OK: APIキーは~/.zshrcから完全に除去されました\")",
       "Read(//Users/haruto/**)",
       "Bash(git ls-tree *)",
-      "Bash(git checkout *)"
+      "Bash(git checkout *)",
+      "Bash(uv export *)"
     ]
   }
 }
