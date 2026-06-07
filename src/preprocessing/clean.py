@@ -110,9 +110,7 @@ def infer_residential_usage(df: pd.DataFrame, score_threshold: int = 2) -> pd.Da
         return condition.fillna(False)
 
     # 各住宅指標（True=住宅らしい）。参照する列が無ければその指標は使わない
-    has_madori = _flag_or_false(
-        result["間取り"].notna() if "間取り" in result.columns else None
-    )
+    has_madori = _flag_or_false(result["間取り"].notna() if "間取り" in result.columns else None)
 
     residential_structures = ["ＲＣ", "ＳＲＣ", "木造", "鉄骨造", "軽量鉄骨造", "ブロック造"]
     has_residential_structure = _flag_or_false(
@@ -127,13 +125,9 @@ def infer_residential_usage(df: pd.DataFrame, score_threshold: int = 2) -> pd.Da
     )
 
     # 参照できなかった列があればログに警告
-    missing_cols = [
-        col for col in ("間取り", "建物の構造", "種類") if col not in result.columns
-    ]
+    missing_cols = [col for col in ("間取り", "建物の構造", "種類") if col not in result.columns]
     if missing_cols:
-        logger.warning(
-            f"infer_residential_usage: 以下の列が無いため指標から除外: {missing_cols}"
-        )
+        logger.warning(f"infer_residential_usage: 以下の列が無いため指標から除外: {missing_cols}")
 
     # スコア合算
     score = (
@@ -251,7 +245,9 @@ def refine_data(df: pd.DataFrame) -> pd.DataFrame:
         # 欠損値を中央値で埋める
         median_construction_year = df["建築年"].median()
         df["建築年"] = df["建築年"].fillna(median_construction_year)
-        logger.info(f"Filled missing values in '建築年' with median value {median_construction_year}.")
+        logger.info(
+            f"Filled missing values in '建築年' with median value {median_construction_year}."
+        )
 
         # 築年数を計算（西暦に変換済みなので数値演算可能）
         current_year = pd.Timestamp.now().year
@@ -341,21 +337,27 @@ def outlier_handling(df: pd.DataFrame) -> pd.DataFrame:
         initial_count = len(df)
         df = df[df["面積（㎡）"] <= 300]
         final_count = len(df)
-        logger.info(f"Removed outliers in '面積（㎡）': {initial_count - final_count} rows removed.")
+        logger.info(
+            f"Removed outliers in '面積（㎡）': {initial_count - final_count} rows removed."
+        )
 
     # 建ぺい率（％）
     if "建ぺい率（％）" in df.columns:
         initial_count = len(df)
         df = df[df["建ぺい率（％）"] <= 600.0]
         final_count = len(df)
-        logger.info(f"Removed outliers in '建ぺい率（％）': {initial_count - final_count} rows removed.")
+        logger.info(
+            f"Removed outliers in '建ぺい率（％）': {initial_count - final_count} rows removed."
+        )
 
     # 容積率（％）: 60.0 <= x <= 800.0で採用
     if "容積率（％）" in df.columns:
         initial_count = len(df)
         df = df[(df["容積率（％）"] >= 60.0) & (df["容積率（％）"] <= 800.0)]
         final_count = len(df)
-        logger.info(f"Removed outliers in '容積率（％）': {initial_count - final_count} rows removed.")
+        logger.info(
+            f"Removed outliers in '容積率（％）': {initial_count - final_count} rows removed."
+        )
 
     return df
 

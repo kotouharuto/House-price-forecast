@@ -247,6 +247,18 @@ wheels = [
 ]
 
 [[package]]
+name = "branca"
+version = "0.8.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "jinja2" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/32/14/9d409124bda3f4ab7af3802aba07181d1fd56aa96cc4b999faea6a27a0d2/branca-0.8.2.tar.gz", hash = "sha256:e5040f4c286e973658c27de9225c1a5a7356dd0702a7c8d84c0f0dfbde388fe7", size = 27890, upload-time = "2025-10-06T10:28:20.305Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7e/50/fc9680058e63161f2f63165b84c957a0df1415431104c408e8104a3a18ef/branca-0.8.2-py3-none-any.whl", hash = "sha256:2ebaef3983e3312733c1ae2b793b0a8ba3e1c4edeb7598e10328505280cf2f7c", size = 26193, upload-time = "2025-10-06T10:28:19.255Z" },
+]
+
+[[package]]
 name = "cachetools"
 version = "7.1.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1944,6 +1956,24 @@ wheels = [
 ]
 
 [[package]]
+name = "optuna-integration"
+version = "4.8.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "optuna" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/8f/d9/bdfd6ac94dd733a4df90e9e5b59273e18978132320949c0ca111a1d579db/optuna_integration-4.8.0.tar.gz", hash = "sha256:9f1e3053500a5a6a23f302cbd7ac371f6dd1010372b4b4374c538b8988bd0603", size = 89695, upload-time = "2026-03-16T04:48:05.535Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/57/cb/c209dbb41829dc856b2bdd5b58e877a6480752bd595d4b55f4a8c514efd5/optuna_integration-4.8.0-py3-none-any.whl", hash = "sha256:bb5c038702f744386b9032b12b993779b02e39e6893c324637178df68998f33d", size = 103151, upload-time = "2026-03-16T04:48:04.232Z" },
+]
+
+[package.optional-dependencies]
+lightgbm = [
+    { name = "lightgbm" },
+    { name = "scikit-learn" },
+]
+
+[[package]]
 name = "packaging"
 version = "26.2"
 source = { registry = "https://pypi.org/simple" }
@@ -2980,6 +3010,21 @@ wheels = [
 ]
 
 [[package]]
+name = "streamlit-folium"
+version = "0.27.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "branca" },
+    { name = "folium" },
+    { name = "jinja2" },
+    { name = "streamlit" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b4/d8/f19603163670473f1d937fe065cef83c34ea581dd5cb50a908754896b9f5/streamlit_folium-0.27.2.tar.gz", hash = "sha256:d3ab790732fa7adb7cda68ec3170116ab6f276998fd46ac79686a4d88c0f4c84", size = 528270, upload-time = "2026-04-29T15:58:58.637Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/00/5a/46c029aef79656fd9786fc1d6c2572855242da378d7f57fa525f75da0441/streamlit_folium-0.27.2-py3-none-any.whl", hash = "sha256:2c6a4168dcbbeadf4c9521d4fecef0984e542081415f91dde6b05b536a5f2b27", size = 530501, upload-time = "2026-04-29T15:58:59.781Z" },
+]
+
+[[package]]
 name = "tenacity"
 version = "9.1.4"
 source = { registry = "https://pypi.org/simple" }
@@ -3034,8 +3079,10 @@ dependencies = [
     { name = "lightgbm" },
     { name = "matplotlib" },
     { name = "matplotlib-fontja" },
+    { name = "mypy" },
     { name = "numpy" },
     { name = "optuna" },
+    { name = "optuna-integration", extra = ["lightgbm"] },
     { name = "pandas" },
     { name = "plotly" },
     { name = "pyyaml" },
@@ -3044,6 +3091,7 @@ dependencies = [
     { name = "seaborn" },
     { name = "shap" },
     { name = "streamlit" },
+    { name = "streamlit-folium" },
     { name = "xgboost" },
 ]
 
@@ -3052,6 +3100,7 @@ dev = [
     { name = "mypy" },
     { name = "pytest" },
     { name = "ruff" },
+    { name = "types-pyyaml" },
 ]
 
 [package.metadata]
@@ -3062,8 +3111,10 @@ requires-dist = [
     { name = "lightgbm" },
     { name = "matplotlib" },
     { name = "matplotlib-fontja" },
+    { name = "mypy", specifier = ">=2.0.0" },
     { name = "numpy" },
     { name = "optuna", specifier = ">=4.8.0" },
+    { name = "optuna-integration", extras = ["lightgbm"] },
     { name = "pandas" },
     { name = "plotly" },
     { name = "pyyaml", specifier = ">=6.0.3" },
@@ -3072,6 +3123,7 @@ requires-dist = [
     { name = "seaborn" },
     { name = "shap" },
     { name = "streamlit" },
+    { name = "streamlit-folium", specifier = ">=0.27.2" },
     { name = "xgboost" },
 ]
 
@@ -3080,6 +3132,7 @@ dev = [
     { name = "mypy", specifier = ">=1.10" },
     { name = "pytest", specifier = ">=8.0" },
     { name = "ruff", specifier = ">=0.15.12" },
+    { name = "types-pyyaml" },
 ]
 
 [[package]]
@@ -3317,4 +3370,13 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/96/9f/d9914a7b8df842832850b1a18e5f47aaa071c217cdd1da2ae9deb291018b/xgboost-3.2.0-py3-none-manylinux_2_28_aarch64.whl", hash = "sha256:852eabc6d3b3702a59bf78dbfdcd1cb9c4d3a3b6e5ed1f8781d8b9512354fdd2", size = 131100954, upload-time = "2026-02-10T11:02:42.704Z" },
     { url = "https://files.pythonhosted.org/packages/79/98/679de17c2caa4fd3b0b4386ecf7377301702cb0afb22930a07c142fcb1d8/xgboost-3.2.0-py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:99b4a6bbcb47212fec5cf5fbe12347215f073c08967431b0122cfbd1ee70312c", size = 131748579, upload-time = "2026-02-10T10:54:40.424Z" },
     { url = "https://files.pythonhosted.org/packages/1f/3d/1661dd114a914a67e3f7ab66fa1382e7599c2a8c340f314ad30a3e2b4d08/xgboost-3.2.0-py3-none-win_amd64.whl", hash = "sha256:0d169736fd836fc13646c7ab787167b3a8110351c2c6bc770c755ee1618f0442", size = 101681668, upload-time = "2026-02-10T10:59:31.202Z" },
+]
+
+[[package]]
+name = "xyzservices"
+version = "2026.3.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f6/08/3cb9f67a8d48021aca2a02292cc26eecd71d949ae70ad66420a8730cc302/xyzservices-2026.3.0.tar.gz", hash = "sha256:d226866a5d8e9fef337034d8da37a8298f0a1d9d1489b4018e69579eb321fea4", size = 1135736, upload-time = "2026-03-30T14:42:25.596Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a8/a9/d23012099dc88ec69a29c6407b41d89681cb674c2043cd5b467c7e299c08/xyzservices-2026.3.0-py3-none-any.whl", hash = "sha256:503183d4b322bfebc3c50cdd21192aa3e81e36c5efbf9133d54ae82143e0576b", size = 94101, upload-time = "2026-03-30T14:42:24.608Z" },
 ]

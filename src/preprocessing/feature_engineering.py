@@ -129,6 +129,7 @@ def categorize_zoning(zoning):
     else:
         return "その他"
 
+
 def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """2地点間の haversine（大円）距離を km 単位で計算する.
 
@@ -336,6 +337,7 @@ def build_features(df: pd.DataFrame) -> pd.DataFrame:
 
     return df
 
+
 def generate_features(df: pd.DataFrame) -> pd.DataFrame:
     """新規特徴量を生成するモジュール.
 
@@ -354,7 +356,9 @@ def generate_features(df: pd.DataFrame) -> pd.DataFrame:
     # 対数変換した 最寄駅：距離（分）
     if "最寄駅：距離（分）" in df.columns:
         df["log_最寄駅：距離"] = np.log(df["最寄駅：距離（分）"].replace(0, np.nan))
-        logger.info("Generated 'log_最寄駅：距離' feature by applying log transformation to '最寄駅：距離（分）'.")
+        logger.info(
+            "Generated 'log_最寄駅：距離' feature by applying log transformation to '最寄駅：距離（分）'."
+        )
 
     # 築年数^2 経年劣化の加速度を表現するため
     if "築年数" in df.columns:
@@ -367,14 +371,16 @@ def generate_features(df: pd.DataFrame) -> pd.DataFrame:
         tokyo_lat, tokyo_lon = 35.681236, 139.767125
 
         df["中心地_距離"] = df.apply(
-            lambda row: haversine(
-                row["最寄駅：緯度"], row["最寄駅：経度"], tokyo_lat, tokyo_lon
-            )
-            if pd.notnull(row["最寄駅：緯度"]) and pd.notnull(row["最寄駅：経度"])
-            else np.nan,
+            lambda row: (
+                haversine(row["最寄駅：緯度"], row["最寄駅：経度"], tokyo_lat, tokyo_lon)
+                if pd.notnull(row["最寄駅：緯度"]) and pd.notnull(row["最寄駅：経度"])
+                else np.nan
+            ),
             axis=1,
         )
-        logger.info("Generated '中心地_距離' feature by calculating Haversine distance to Tokyo Station.")
+        logger.info(
+            "Generated '中心地_距離' feature by calculating Haversine distance to Tokyo Station."
+        )
 
     # 山手線の内側かどうかを判定
     if {"最寄駅：緯度", "最寄駅：経度"}.issubset(df.columns):
@@ -400,6 +406,9 @@ def generate_features(df: pd.DataFrame) -> pd.DataFrame:
     if {"容積率（％）", "最寄駅：距離（分）"}.issubset(df.columns):
         df["容積距離"] = df["容積率（％）"] * df["最寄駅：距離（分）"]
         logger.info("Added 容積距離 in dataframe")
+
+    # 低額帯(~2000万円未満)の特徴量強化
+    
 
     return df
 
