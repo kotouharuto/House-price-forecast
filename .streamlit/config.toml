@@ -1,0 +1,9 @@
+[server]
+# Streamlit Cloud はポート8501を使用
+headless = true
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+base = "light"

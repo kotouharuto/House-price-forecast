@@ -1,64 +1,46 @@
-"""設定値を管理するモジュール."""
+"""設定値を管理するモジュール.
+
+``configs/model_params.yaml`` などの YAML 設定を読み込み、モデル学習側の
+コードに渡すための薄いラッパを提供する。
+"""
 
 from pathlib import Path
 from typing import Any
 
 import yaml
 
-from src.utils.logger import get_logger
-
-logger = get_logger(__name__)
-
-# 設定ファイルの配置先（プロジェクトルート基準の絶対パスで固定）
+# プロジェクトルート基準の絶対パス（呼び出し場所に依存しないようにする）
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
-_MODEL_PARAMS_PATH = _PROJECT_ROOT / "configs" / "model_params.yaml"
+_DEFAULT_MODEL_PARAMS_PATH = _PROJECT_ROOT / "configs" / "model_params.yaml"
+
+# モデル設定 yaml に必須のトップレベルセクション
+_REQUIRED_SECTIONS: tuple[str, ...] = ("lgbm", "split")
 
 
 def load_model_params(
-    section: str = "lgbm",
-    params_path: Path = _MODEL_PARAMS_PATH,
+    file_path: str | Path = _DEFAULT_MODEL_PARAMS_PATH,
 ) -> dict[str, Any]:
-    """YAMLファイルからモデルのハイパーパラメータを読み込む.
-
-    設定値（ハイパーパラメータ）をコードから分離し、``configs/model_params.yaml``
-    で一元管理するためのローダ。指定セクションの内容をそのまま辞書で返すため、
-    ``LGBMRegressor(**load_model_params("lgbm"))`` のように展開して利用できる。
+    """``model_params.yaml`` を読み込み、必須セクションの存在を検証する.
 
     Args:
-        section: 読み込むパラメータのセクション名（例: ``"lgbm"``）。
-        params_path: パラメータYAMLファイルのパス。デフォルトは
-            ``configs/model_params.yaml``。
+        file_path: 設定 YAML のパス。デフォルトは ``configs/model_params.yaml``。
 
     Returns:
-        ハイパーパラメータ名をキーとする辞書。
+        ``{"lgbm": {...}, "split": {...}}`` の辞書。
 
     Raises:
-        FileNotFoundError: 指定したYAMLファイルが存在しない場合。
-        TypeError: YAML全体またはセクションがマッピング（辞書）でない場合。
-        KeyError: 指定したセクションがYAML内に存在しない場合。
+        FileNotFoundError: 設定ファイルが存在しない場合。
+        KeyError: 必須セクション（``lgbm`` / ``split``）が欠落している場合。
     """
-    if not params_path.exists():
-        logger.error(f"モデルパラメータファイルが見つかりません: {params_path}")
-        raise FileNotFoundError(f"モデルパラメータファイルが見つかりません: {params_path}")
+    path = Path(file_path)
+    if not path.exists():
+        raise FileNotFoundError(f"モデル設定が見つかりません: {path}")
 
-    with params_path.open("r", encoding="utf-8") as f:
-        config = yaml.safe_load(f)
+    with path.open(encoding="utf-8") as f:
+        params: dict[str, Any] = yaml.safe_load(f) or {}
 
-    # YAML全体が辞書（マッピング）であることを保証する
-    if not isinstance(config, dict):
-        logger.error(f"パラメータファイルの形式が不正です（辞書を想定）: {params_path}")
-        raise TypeError(f"パラメータファイルの形式が不正です（辞書を想定）: {params_path}")
+    missing = [key for key in _REQUIRED_SECTIONS if key not in params]
+    if missing:
+        raise KeyError(f"model_params.yaml に必須セクションがありません: {missing} (path={path})")
 
-    if section not in config:
-        logger.error(f"セクション '{section}' が {params_path} に存在しません")
-        raise KeyError(f"セクション '{section}' が {params_path} に存在しません")
-
-    params = config[section]
-
-    # セクション直下もマッピングであることを保証する
-    if not isinstance(params, dict):
-        logger.error(f"セクション '{section}' はマッピングである必要があります: {params_path}")
-        raise TypeError(f"セクション '{section}' はマッピングである必要があります: {params_path}")
-
-    logger.info(f"モデルパラメータを読み込みました: section={section}, keys={list(params.keys())}")
     return params

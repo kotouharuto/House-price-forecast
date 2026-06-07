@@ -29,6 +29,49 @@ st.set_page_config(
     layout="wide",
 )
 
+# ---------- Streamlit Cloud 用のアセット自動ダウンロード ----------
+# HuggingFace Hub に置いた学習済みモデル・予測結果ファイルを、ローカルに無ければ取得する。
+# 既存ファイルがある（ローカル開発）場合はスキップ。
+_HF_REPO_ID = "Haruto0321/tokyo-rent-predictor-data"
+_DOWNLOAD_FILES: list[tuple[str, Path]] = [
+    ("models/lgbm_model.pkl", _PROJECT_ROOT / "models" / "lgbm_model.pkl"),
+    ("outputs/test_predictions.csv", _PROJECT_ROOT / "outputs" / "test_predictions.csv"),
+    (
+        "outputs/test_predictions_properties.geojson",
+        _PROJECT_ROOT / "outputs" / "test_predictions_properties.geojson",
+    ),
+    (
+        "outputs/test_predictions_stations.geojson",
+        _PROJECT_ROOT / "outputs" / "test_predictions_stations.geojson",
+    ),
+]
+
+
+@st.cache_resource(show_spinner="データを準備しています...")
+def _download_assets() -> None:
+    """HuggingFace Hub から必要なファイルをダウンロードする.
+
+    既にローカルに存在する場合はスキップする（ローカル開発環境への配慮）。
+    """
+    import shutil
+
+    from huggingface_hub import hf_hub_download
+
+    for hf_path, local_path in _DOWNLOAD_FILES:
+        if local_path.exists():
+            continue
+
+        local_path.parent.mkdir(parents=True, exist_ok=True)
+        downloaded = hf_hub_download(
+            repo_id=_HF_REPO_ID,
+            filename=hf_path,
+            repo_type="dataset",
+            local_dir=str(_PROJECT_ROOT),
+        )
+        # hf_hub_download はキャッシュディレクトリに置くため、指定パスへコピー
+        if Path(downloaded) != local_path:
+            shutil.copy2(downloaded, local_path)
+
 
 @st.cache_data
 def _load() -> pd.DataFrame:
@@ -179,6 +222,9 @@ def _render_navigation() -> None:
 
 def main() -> None:
     """エントリポイント."""
+    # Streamlit Cloud では HuggingFace Hub からアセットを事前取得（ローカルなら即帰る）
+    _download_assets()
+
     _render_overview()
     st.divider()
 
