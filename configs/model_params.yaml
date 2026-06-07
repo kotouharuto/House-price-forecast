@@ -1,0 +1,39 @@
+# モデル学習の主要パラメータ
+# 変更時は実験管理表（docs/model_experiment_log.md）に EXP-ID を起こすこと。
+# 関連: docs/model_experiment_proposals.md (PROP-001 Huber 損失採用)
+
+# ---------- LightGBM 本体 ----------
+lgbm:
+  # 損失関数。huber は外れ値耐性を上げる（PROP-001 で採用）。
+  # 代替候補: regression (MSE), quantile (中央値推定)
+  objective: huber
+
+  # 内部評価指標
+  metric: rmse
+
+  # 学習設定
+  n_estimators: 1000
+  learning_rate: 0.05
+  num_leaves: 31
+  min_child_samples: 20
+
+  # サンプリング
+  subsample: 0.8
+  subsample_freq: 1
+  colsample_bytree: 0.8
+
+  # 正則化
+  reg_alpha: 0.1
+  reg_lambda: 0.1
+
+  # 実行設定
+  random_state: 42
+  n_jobs: -1
+  verbose: -1
+
+# ---------- データ分割 ----------
+split:
+  # 全データのうち test に割く比率（scikit-learn の train_test_split デフォルトは 0.25）
+  test_size: 0.25
+  # 分割の再現性確保のための seed
+  random_state: 42
