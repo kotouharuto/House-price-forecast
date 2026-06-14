@@ -29,6 +29,11 @@ from src.utils.logger import get_logger  # noqa: E402
 _TARGET_COLUMN = "取引価格（総額）"
 _LOG_TARGET_COLUMN = "log_取引価格"
 
+# 特徴量から除外する非特徴量列。
+# 取引年は類似物件検索などで使うために残しているが、モデル学習からは除外する
+# （取引時期を学習に用いると将来のデータ分布に対する汎化性能が落ちる可能性があるため）。
+_NON_FEATURE_COLUMNS: tuple[str, ...] = ("取引年",)
+
 # モデル保存先（モジュール import 時に保存先ディレクトリを保証する）
 _MODEL_DIR = _PROJECT_ROOT / "models"
 _MODEL_DIR.mkdir(parents=True, exist_ok=True)
@@ -78,9 +83,11 @@ def prepare_dataset() -> tuple[pd.DataFrame, pd.Series]:
     df = df[df[_TARGET_COLUMN] > 0]
     df[_LOG_TARGET_COLUMN] = np.log(df[_TARGET_COLUMN])
 
-    # 目的変数はリークになるため特徴量から除外する
-    leak_columns = [_TARGET_COLUMN, _LOG_TARGET_COLUMN]
-    x = df.drop(columns=leak_columns)
+    # 目的変数はリークになるため特徴量から除外する。
+    # 非特徴量列（取引年など、分析用に残しているが学習では使わない列）も除外する。
+    drop_columns = [_TARGET_COLUMN, _LOG_TARGET_COLUMN, *_NON_FEATURE_COLUMNS]
+    drop_columns = [c for c in drop_columns if c in df.columns]
+    x = df.drop(columns=drop_columns)
     y = df[_LOG_TARGET_COLUMN]
     return x, y
 
