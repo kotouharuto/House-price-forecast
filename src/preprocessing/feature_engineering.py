@@ -315,10 +315,13 @@ def build_features(df: pd.DataFrame) -> pd.DataFrame:
         df[["取引年", "取引四半期"]] = df["取引時期"].astype(str).str.extract(period_pattern)
 
         df["取引四半期"] = pd.to_numeric(df["取引四半期"], errors="coerce").astype("Int64")
+        df["取引年"] = pd.to_numeric(df["取引年"], errors="coerce").astype("Int64")
         logger.info("Extracted '取引年' and '取引四半期' from '取引時期' column.")
 
-        df.drop(columns=["取引時期", "取引年"], inplace=True)
-        logger.info("Dropped '取引時期' and '取引年' columns.")
+        # 取引時期は派生済みなので drop。取引年は類似物件検索などで使うため残す
+        # （モデル学習からは train.py 側で除外する）
+        df.drop(columns=["取引時期"], inplace=True)
+        logger.info("Dropped '取引時期' column.")
 
     if "改装" in df.columns:
         mapping = {
@@ -408,7 +411,6 @@ def generate_features(df: pd.DataFrame) -> pd.DataFrame:
         logger.info("Added 容積距離 in dataframe")
 
     # 低額帯(~2000万円未満)の特徴量強化
-
 
     return df
 
