@@ -15,7 +15,7 @@ What-if 分析が AVM 文脈で限定的だった反省を踏まえ、業界実�
 | フェーズ | 内容 | 状態 |
 |---|---|---|
 | **Phase 1: 類似物件比較（関数）** | 階層フィルタ + 正規化ユークリッド距離による kNN | ✅ 完了 |
-| **Phase 2: Quantile Regression（信頼区間）** | LightGBM 分位回帰で予測区間を出す | ⬜ 未着手 |
+| **Phase 2: Quantile Regression（信頼区間）** | LightGBM 分位回帰で予測区間を出す | ✅ 完了 |
 | **Phase 3: 類似物件からの実証的区間** | 類似物件 N 件の実取引価格分位点から区間を出す | ⬜ 未着手 |
 | **Phase 4: Streamlit ページ統合** | 顧客向け査定 UI（類似物件 + 区間の表示） | ⬜ 未着手 |
 | **Phase 5: モデル評価への組込** | 信頼区間カバレッジ率の評価指標化 | ⬜ 未着手 |
@@ -45,7 +45,7 @@ What-if 分析が AVM 文脈で限定的だった反省を踏まえ、業界実�
 
 ---
 
-## Phase 2: Quantile Regression（信頼区間） ⬜
+## Phase 2: Quantile Regression（信頼区間） ✅
 
 LightGBM の `objective="quantile"` を使い、点推定だけでなく**統計的な予測区間**を返せるようにする。
 
@@ -56,18 +56,37 @@ LightGBM の `objective="quantile"` を使い、点推定だけでなく**統計
 - カバレッジ率（実価格が予測区間に入る割合）の検証
 
 ### タスク
-- ⬜ `configs/model_params.yaml` に `quantile:` セクション追加（α リスト・流用ハイパラ）
-- ⬜ `src/modeling/train_quantile.py`: 3 モデル学習スクリプト新規
-- ⬜ モデル保存: `models/lgbm_quantile_low.pkl` / `..._med.pkl` / `..._high.pkl`
-- ⬜ `src/visualization/prediction.py`: `predict_with_interval()` 関数（lower / median / upper を返す）
-- ⬜ `tests/test_train_quantile.py`: 学習・保存・予測の単体テスト
-- ⬜ テストセットでカバレッジ率を計測（目標: 90% 区間で実カバレッジ 85〜95%）
-- ⬜ ruff / mypy / pytest 通過確認
+- ✅ `configs/model_params.yaml` に `quantile:` セクション追加（α リスト・流用ハイパラ）
+- ✅ `src/modeling/train_quantile.py`: 3 モデル学習スクリプト新規
+- ✅ モデル保存: `models/lgbm_quantile_low.pkl` / `..._med.pkl` / `..._high.pkl`
+- ✅ `src/visualization/prediction.py`: `predict_with_interval()` 関数（lower / median / upper を返す）
+- ✅ `tests/test_train_quantile.py` / `tests/test_prediction.py`: 単体テスト 12 件追加
+- ✅ テストセットでカバレッジ率を計測（学習スクリプト末尾でログ出力）
+- ✅ ruff / pytest 通過確認（pytest 90 件全 PASS）
 
-### 設計判断（着手前確認事項）
+### 設計判断（採用）
 - 既存 `lgbm_model.pkl` を **置き換えない**（BI ツール影響をゼロに）
 - `train_quantile.py` で **3 モデル別学習**（α ごとに独立）
 - 学習データは既存 `prepare_dataset()` を流用
+- YAML は `lgbm` セクションを継承し `quantile.overrides` で objective / metric のみ上書き
+
+### 成果物
+- [src/modeling/train_quantile.py](../src/modeling/train_quantile.py)
+- [src/visualization/prediction.py](../src/visualization/prediction.py)
+- [tests/test_train_quantile.py](../tests/test_train_quantile.py)
+- [tests/test_prediction.py](../tests/test_prediction.py)
+- `models/lgbm_quantile_{low,med,high}.pkl`
+
+### 初回学習結果（2026-06-14）
+| 項目 | 値 | 評価 |
+|---|---|---|
+| 名目カバレッジ率 | 90% | — |
+| **実カバレッジ率** | **78.94%** | ⚠️ 目標 85〜95% を下回る |
+| 差分 | −11.06pp | 区間が**狭すぎる** = モデル過信 |
+| 区間幅 中央値 | 2,007 万円 | — |
+| 区間幅 平均 | 3,402 万円 | — |
+
+⚠️ **キャリブレーション要改善**。実カバレッジが目標を下回っているため、Phase 5（評価指標化）で価格帯別の分析を行い、α 拡張やハイパラ調整を検討する。Phase 2 のスコープ（実装と検証パイプライン整備）は完了。
 
 ---
 

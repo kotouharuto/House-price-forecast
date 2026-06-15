@@ -37,3 +37,17 @@ split:
   test_size: 0.25
   # 分割の再現性確保のための seed
   random_state: 42
+
+# ---------- Quantile Regression（予測区間） ----------
+# 説明可能性ロードマップ Phase 2 で追加。
+# 3 つの α 値で別々の LightGBM を学習し、予測区間（lower / median / upper）を提供する。
+# lgbm セクションをベースにし、objective / metric のみ overrides で上書きする方針。
+quantile:
+  # 学習する分位点。昇順で 3 つ指定する想定（low / median / high）。
+  alphas: [0.05, 0.50, 0.95]
+
+  # lgbm セクションを継承した上で上書きするパラメータ。
+  # huber は分位点回帰に対応していないため objective / metric を上書きする。
+  overrides:
+    objective: quantile
+    metric: quantile
