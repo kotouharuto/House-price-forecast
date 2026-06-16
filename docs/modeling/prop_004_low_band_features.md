@@ -2,8 +2,8 @@
 
 実験案 PROP-004 の詳細解説。実装着手前にスコープ・狙い・期待効果・リスクを明確化するための文書。
 
-- 案サマリ: [model_experiment_proposals.md](model_experiment_proposals.md) §PROP-004
-- 実験結果記録: [model_experiment_log.md](model_experiment_log.md)
+- 案サマリ: [experiment_proposals.md](experiment_proposals.md) §PROP-004
+- 実験結果記録: [experiment_log.md](experiment_log.md)
 - 評価指標定義: [evaluation_metrics.md](evaluation_metrics.md)
 
 ---

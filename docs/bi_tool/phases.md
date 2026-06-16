@@ -3,10 +3,10 @@
 予測結果可視化BIツールの開発を、**フェーズ（P0〜P6）ごとの範囲**で整理した一覧。
 「どのフェーズで何をやるか／どこまで終わっているか」を素早く把握するための文書。
 
-- 要件の出典: [bi_tool_spec.md](bi_tool_spec.md)（要件定義・§5.1 フェーズ分け）
-- P0/P1の改善作業: [bi_tool_p0_p1_improvement_plan.md](bi_tool_p0_p1_improvement_plan.md)
-- 実装サマリ: [bi_tool_implementation_summary.md](bi_tool_implementation_summary.md)
-- 指標解説: [evaluation_metrics.md](evaluation_metrics.md)
+- 要件の出典: [spec.md](spec.md)（要件定義・§5.1 フェーズ分け）
+- P0/P1の改善作業: [p0_p1_improvement_plan.md](p0_p1_improvement_plan.md)
+- 実装サマリ: [implementation_summary.md](implementation_summary.md)
+- 指標解説: [../modeling/evaluation_metrics.md](../modeling/evaluation_metrics.md)
 
 > **状態の凡例**: ✅ 完了 / ⚠️ 一部未達（残課題あり） / ⬜ 未着手
 
@@ -193,7 +193,7 @@ BIツールを公開URL化し、外部から閲覧可能な状態にする。
   - 各ページ（BIダッシュボード／地図）への導線
   - 現行モデルの主要評価指標サマリ（R²log・MAE・RMSE・MAPE・Median APE・PE10 等）
 - **評価指標一覧の追加**: 各指標の定義・計算式・解釈・閾値の一覧をアプリ内で参照可能に
-  - 既存の `docs/evaluation_metrics.md` を Streamlit ページ化、もしくはトップページ内のセクションとして実装
+  - 既存の `docs/../modeling/evaluation_metrics.md` を Streamlit ページ化、もしくはトップページ内のセクションとして実装
   - 価格帯別の指標表示（業界基準との比較）
 
 ### 対応要件

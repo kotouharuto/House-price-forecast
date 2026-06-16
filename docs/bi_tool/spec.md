@@ -52,7 +52,7 @@ BIツール**の要件を定義する。グラフによる多面的な分析と�
 
 #### M-2. KPIサマリ（ヘッダ指標）
 - 全体の評価指標をカード形式で表示: 件数, R²(log), MAE(円), RMSE(円), MAPE(%), Median APE(%)。
-- 指標の意味は `docs/evaluation_metrics.md` を参照リンクとして併記。
+- 指標の意味は `docs/../modeling/evaluation_metrics.md` を参照リンクとして併記。
 
 #### M-3. BIグラフ（Plotly）
 | グラフ | 内容 | 列 |

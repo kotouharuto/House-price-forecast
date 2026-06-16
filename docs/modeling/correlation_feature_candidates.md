@@ -5,8 +5,8 @@
 関連:
 
 - 低額帯向け詳細案: [prop_004_low_band_features.md](prop_004_low_band_features.md)
-- 実験案管理: [model_experiment_proposals.md](model_experiment_proposals.md)
-- 実験ログ: [model_experiment_log.md](model_experiment_log.md)
+- 実験案管理: [experiment_proposals.md](experiment_proposals.md)
+- 実験ログ: [experiment_log.md](experiment_log.md)
 
 ---
 
