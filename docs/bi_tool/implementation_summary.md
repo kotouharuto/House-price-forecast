@@ -8,10 +8,10 @@ UIに依存しない集計・ローディングロジックを `src/visualizatio
 Streamlit のページ層（`app/pages/`）はその上に立つ薄いUIとして実装した。
 ページ間で共通利用するフィルタは `app/filters.py` に切り出している。
 
-- 関連仕様: [bi_tool_spec.md](bi_tool_spec.md)
-- フェーズ別スコープ: [bi_tool_phases.md](bi_tool_phases.md)
-- P0/P1 改善計画: [bi_tool_p0_p1_improvement_plan.md](bi_tool_p0_p1_improvement_plan.md)
-- 指標定義: [evaluation_metrics.md](evaluation_metrics.md)
+- 関連仕様: [spec.md](spec.md)
+- フェーズ別スコープ: [phases.md](phases.md)
+- P0/P1 改善計画: [p0_p1_improvement_plan.md](p0_p1_improvement_plan.md)
+- 指標定義: [../modeling/evaluation_metrics.md](../modeling/evaluation_metrics.md)
 
 ---
 
@@ -35,11 +35,11 @@ Streamlit のページ層（`app/pages/`）はその上に立つ薄いUIとし�
 ### ドキュメント
 | ファイル | 役割 |
 |---|---|
-| `docs/bi_tool_spec.md` | 要件定義書（機能・非機能・実装計画） |
-| `docs/bi_tool_phases.md` | フェーズ別スコープと現状の状態 |
-| `docs/bi_tool_p0_p1_improvement_plan.md` | P0/P1 の改善作業指示書 |
-| `docs/bi_tool_implementation_summary.md` | 本文書（最終サマリ） |
-| `docs/evaluation_metrics.md` | 評価指標の定義 |
+| `docs/spec.md` | 要件定義書（機能・非機能・実装計画） |
+| `docs/phases.md` | フェーズ別スコープと現状の状態 |
+| `docs/p0_p1_improvement_plan.md` | P0/P1 の改善作業指示書 |
+| `docs/implementation_summary.md` | 本文書（最終サマリ） |
+| `docs/../modeling/evaluation_metrics.md` | 評価指標の定義 |
 
 ### 集計・ロジック層（UI非依存）
 | ファイル | 役割 |

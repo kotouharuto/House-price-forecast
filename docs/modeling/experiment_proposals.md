@@ -1,14 +1,14 @@
 # モデル実験案管理表
 
 「実施前」の実験案（仮説・改善アイデア）を集約・優先順位付け・状態管理するシート。
-実施に移ったら結果は [model_experiment_log.md](model_experiment_log.md) 側に記録する。
+実施に移ったら結果は [experiment_log.md](experiment_log.md) 側に記録する。
 
 両シートの役割分担:
 
 | シート | 何を書くか | 主な目的 |
 |---|---|---|
 | 本シート（実験「案」） | 未実施の案・仮説・期待効果・優先度・状態 | 何をやるか／やらないかの判断材料 |
-| 実験ログ（[model_experiment_log.md](model_experiment_log.md)） | 実施済の介入・スコア・観察・次の手 | 結果と学びの蓄積 |
+| 実験ログ（[experiment_log.md](experiment_log.md)） | 実施済の介入・スコア・観察・次の手 | 結果と学びの蓄積 |
 
 ---
 
@@ -16,7 +16,7 @@
 
 ### 案IDの付け方
 - 実験案には `PROP-XXX` を採番（連番。欠番は埋め直さない）
-- 実施に移ったら `model_experiment_log.md` 側で `EXP-YYY` を採番し、本シートの「紐EXP」欄にリンクする
+- 実施に移ったら `experiment_log.md` 側で `EXP-YYY` を採番し、本シートの「紐EXP」欄にリンクする
 - 実施案は本シートから削除せず、状態を「Done」または「Rejected」に変えて履歴を残す
 
 ### 状態（Status）
@@ -331,7 +331,7 @@
 1. §5 のテンプレートをコピーして §3 に貼り、内容を埋める
 2. §2 のサマリ表に1行追加（起票日・優先度・状態=Proposed）
 3. レビューで Approved になったら状態を更新
-4. 実施に着手したら状態を In Progress、`model_experiment_log.md` に EXP-YYY を起こす
+4. 実施に着手したら状態を In Progress、`experiment_log.md` に EXP-YYY を起こす
 5. 実施完了後、本シートの状態を Done または Rejected に変え、「紐EXP」欄にリンクを記入
 
 ---

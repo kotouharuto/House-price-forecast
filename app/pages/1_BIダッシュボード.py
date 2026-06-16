@@ -101,7 +101,7 @@ def _render_kpis(df: pd.DataFrame) -> None:
         f"{metrics['median_ape']:.1f}%",
         help="絶対パーセント誤差の中央値（%）。外れ値に頑健",
     )
-    st.caption("各指標の意味は docs/evaluation_metrics.md を参照。")
+    st.caption("各指標の意味は docs/modeling/evaluation_metrics.md を参照。")
 
 
 def _sample_for_plot(df: pd.DataFrame) -> pd.DataFrame:

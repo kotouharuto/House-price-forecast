@@ -4,7 +4,7 @@
 What-if 分析が AVM 文脈で限定的だった反省を踏まえ、業界実務に整合する「**類似物件比較**」と「**信頼区間**」を中心に据える。
 
 - 思想の整理: [whatif_analysis_guide.md](whatif_analysis_guide.md)（What-if の限界と代替手法）
-- BI ツールの全体像: [bi_tool_phases.md](bi_tool_phases.md)
+- BI ツールの全体像: [../bi_tool/phases.md](../bi_tool/phases.md)
 
 > **状態の凡例**: ✅ 完了 / 🔄 進行中 / ⚠️ 一部未達 / ⬜ 未着手
 
@@ -121,7 +121,7 @@ LightGBM の `objective="quantile"` を使い、点推定だけでなく**統計
 - ⬜ `app/pages/4_物件査定.py` 新規作成
 - ⬜ 物件選択 UI（サイドバーで条件絞り込み → セレクトボックス）
 - ⬜ 予測値カード（中央値 + 区間バー）
-- ⬜ 類似物件テーブル（[bi_tool_phases.md](bi_tool_phases.md) の表示規約に準拠）
+- ⬜ 類似物件テーブル（[../bi_tool/phases.md](../bi_tool/phases.md) の表示規約に準拠）
 - ⬜ 類似物件の実価格分布ヒストグラム
 - ⬜ 査定信頼度の判定（高 / 中 / 低）
 - ⬜ `test_predictions.csv` への `取引年` 追加（Phase 4 で恒久対応する想定）
@@ -166,6 +166,6 @@ LightGBM の `objective="quantile"` を使い、点推定だけでなく**統計
 ## 関連文書
 
 - [whatif_analysis_guide.md](whatif_analysis_guide.md) — What-if 分析の限界と代替手法の整理
-- [bi_tool_phases.md](bi_tool_phases.md) — BI ツール本体のフェーズ管理
-- [evaluation_metrics.md](evaluation_metrics.md) — 既存評価指標の定義
-- [model_experiment_log.md](model_experiment_log.md) — モデル実験ログ
+- [../bi_tool/phases.md](../bi_tool/phases.md) — BI ツール本体のフェーズ管理
+- [../modeling/evaluation_metrics.md](../modeling/evaluation_metrics.md) — 既存評価指標の定義
+- [../modeling/experiment_log.md](../modeling/experiment_log.md) — モデル実験ログ

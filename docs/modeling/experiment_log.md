@@ -252,7 +252,7 @@
   - 連続的な重み（`price^α`、`α` を小さめに）で滑らかにする
   - 低額帯のみ up-weight、高額帯はそのまま（非対称重み）
 - ベストは引き続き EXP-001
-- 実験案管理表（[model_experiment_proposals.md](model_experiment_proposals.md)）の PROP-002 状態更新と、後続案の起票は別途検討
+- 実験案管理表（[experiment_proposals.md](experiment_proposals.md)）の PROP-002 状態更新と、後続案の起票は別途検討
 
 ---
 

@@ -64,5 +64,5 @@
 ## 関連ドキュメント
 
 - [correlation_feature_candidates.md](correlation_feature_candidates.md) — 既存特徴量の相関分析候補
-- [model_experiment_proposals.md](model_experiment_proposals.md) — 実験提案一覧
+- [experiment_proposals.md](experiment_proposals.md) — 実験提案一覧
 - [prop_004_low_band_features.md](prop_004_low_band_features.md) — 低額帯向け特徴強化

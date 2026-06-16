@@ -1,6 +1,6 @@
 # BIツール P0/P1 改善計画
 
-`docs/bi_tool_spec.md` を基準に、現在のBIダッシュボード実装で優先して改善したい
+`docs/spec.md` を基準に、現在のBIダッシュボード実装で優先して改善したい
 P0/P1項目をまとめる。Claude Codeなどに実装依頼する際の作業指示として使う。
 
 ## 目的
@@ -16,7 +16,7 @@ P0/P1項目をまとめる。Claude Codeなどに実装依頼する際の作業�
 - `src/visualization/aggregate.py`
 - `app/pages/1_BIダッシュボード.py`
 - `tests/test_aggregate.py`
-- 必要に応じて `docs/bi_tool_implementation_summary.md`
+- 必要に応じて `docs/implementation_summary.md`
 
 ## ブランチ方針
 

@@ -6,7 +6,8 @@
       "Read(//Users/haruto/**)",
       "Bash(git ls-tree *)",
       "Bash(git checkout *)",
-      "Bash(uv export *)"
+      "Bash(uv export *)",
+      "Bash(gh pr create --title 'feat: 説明可能性 P2 — 分位点回帰による予測区間と信頼区間の実装' --body ' *)"
     ]
   },
   "disabledMcpjsonServers": [

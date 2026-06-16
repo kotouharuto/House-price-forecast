@@ -3,7 +3,7 @@
 `notebooks/04_predict_analysis.ipynb` の What-if 分析セクション（基本版 + Step 1〜3）で出力される結果を、**非データサイエンティストも含めたチーム全員が同じ理解で読める**ようにするためのガイド。
 
 - 対象ファイル: [notebooks/04_predict_analysis.ipynb](../notebooks/04_predict_analysis.ipynb)
-- 関連: [evaluation_metrics.md](evaluation_metrics.md) / [bi_tool_phases.md](bi_tool_phases.md)
+- 関連: [../modeling/evaluation_metrics.md](../modeling/evaluation_metrics.md) / [../bi_tool/phases.md](../bi_tool/phases.md)
 
 ---
 

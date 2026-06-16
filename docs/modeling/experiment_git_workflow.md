@@ -4,8 +4,8 @@ ML 実験は性質上「不採用」で終わる割合が高いため、ナイ�
 `main` ブランチが捨てられた実験コードや巨大な生成物で汚染されていく。
 本ドキュメントでは、本プロジェクトで採用する Git / PR 運用ルールを定義する。
 
-関連: [model_experiment_log.md](model_experiment_log.md) /
-[model_experiment_proposals.md](model_experiment_proposals.md)
+関連: [experiment_log.md](experiment_log.md) /
+[experiment_proposals.md](experiment_proposals.md)
 
 ---
 
@@ -57,7 +57,7 @@ git commit -m "exp: EXP-XXX の介入実装"
 uv run python -m src.modeling.train
 
 # 3. ドキュメント更新
-編集 docs/model_experiment_log.md docs/model_experiment_proposals.md
+編集 docs/experiment_log.md docs/experiment_proposals.md
 git add docs/
 git commit -m "docs: EXP-XXX の結果記録と PROP-XXX の状態更新"
 
@@ -80,7 +80,7 @@ git push -u origin exp-XXX
 ## 4. 採否判断と PR マージ
 
 ### 採否の根拠
-PR の採否判断は、[model_experiment_proposals.md](model_experiment_proposals.md) の
+PR の採否判断は、[experiment_proposals.md](experiment_proposals.md) の
 該当 PROP-XXX で定めた **採用条件** を満たすか否かで行う。
 PR 本文にチェックリスト形式で記載し、レビューで明示する。
 
@@ -92,8 +92,8 @@ PR 本文にチェックリスト形式で記載し、レビューで明示す�
 
 ### 採用時の手順
 1. PR をそのままマージ（コード + ドキュメント両方）
-2. `model_experiment_proposals.md` の PROP-XXX の状態を `Done` に更新
-3. `model_experiment_log.md` の Best? 列を新ベストに移す（旧ベストの印は外す）
+2. `experiment_proposals.md` の PROP-XXX の状態を `Done` に更新
+3. `experiment_log.md` の Best? 列を新ベストに移す（旧ベストの印は外す）
 4. `models/best_params.yaml` の上書きの有無を実験エントリに明記
 
 ### 不採用時の手順（重要）
@@ -128,7 +128,7 @@ PR の diff が `docs/model_experiment_*.md` だけになるので、そのま�
 git switch -c docs-exp-XXX main
 
 # 実験ブランチから docs ファイルだけ取り込む
-git checkout exp-XXX -- docs/model_experiment_log.md docs/model_experiment_proposals.md
+git checkout exp-XXX -- docs/experiment_log.md docs/experiment_proposals.md
 
 git add docs/
 git commit -m "docs: EXP-XXX の実験記録を追加"
@@ -255,8 +255,8 @@ git commit -m "chore: 生成物を gitignore に切替"
 | 知りたいこと | 参照先 |
 |---|---|
 | 現行ベストモデルの構成 | `main` の `src/modeling/train.py` ＋ `models/best_params.yaml`（baseline退避先） |
-| 過去にどんな実験を試したか | `main` の [model_experiment_log.md](model_experiment_log.md) |
-| 未実施の改善アイデア | `main` の [model_experiment_proposals.md](model_experiment_proposals.md) |
+| 過去にどんな実験を試したか | `main` の [experiment_log.md](experiment_log.md) |
+| 未実施の改善アイデア | `main` の [experiment_proposals.md](experiment_proposals.md) |
 | 不採用実験の具体的なコード | `exp-XXX` ブランチ（リモートに残す） |
 | 採用された変更の経緯 | `main` の git log（`feat:` / `fix:` プレフィックスで絞り込み） |
 | 実験そのものの経緯 | `main` の git log（`exp:` / `docs:` プレフィックスで絞り込み） |
@@ -292,7 +292,7 @@ git log --oneline --grep "^exp:\|^docs: EXP"
 
 - [ ] `.gitignore` に生成物のパターンを追加済み
 - [ ] 既にコミット済みの生成物は `git rm --cached` で追跡解除済み
-- [ ] 実験案管理表（[model_experiment_proposals.md](model_experiment_proposals.md)）に該当案がある
+- [ ] 実験案管理表（[experiment_proposals.md](experiment_proposals.md)）に該当案がある
 - [ ] 採用条件が明文化されている
 - [ ] ブランチ命名と PR タイトルのプレフィックス規約を把握している
 - [ ] コードとドキュメントを別コミットにする運用を理解している
