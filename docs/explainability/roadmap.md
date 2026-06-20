@@ -100,10 +100,10 @@ LightGBM の `objective="quantile"` を使い、点推定だけでなく**統計
 - 両区間の乖離が大きいときは「モデル不確実」フラグを立てる
 
 ### タスク
-- ⬜ `src/visualization/prediction.py` に `empirical_interval_from_similar()` 関数追加
-- ⬜ パラメータ: `n_similar`（既定 30）、`lower_q` / `upper_q`（既定 0.10 / 0.90）
-- ⬜ Quantile 区間と実証的区間を並べて返す統合関数 `compare_intervals()`
-- ⬜ テスト追加（小規模 DataFrame で分位点が想定通り出ること）
+- ✅ `src/visualization/prediction.py` に `empirical_interval_from_similar()` 関数追加
+- ✅ パラメータ: `n_similar`（既定 30）、`lower_q` / `upper_q`（既定 0.10 / 0.90）
+- ✅Quantile 区間と実証的区間を並べて返す統合関数 `compare_intervals()`
+- ✅ テスト追加（小規模 DataFrame で分位点が想定通り出ること）
 - ⬜ ノートブック `05_property_appraisal.ipynb` で可視化プロトタイプ
 
 ---
