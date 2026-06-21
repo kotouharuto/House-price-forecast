@@ -7,30 +7,20 @@
     huggingface-cli login  # HF_TOKEN を設定
 """
 
+import sys
 from pathlib import Path
 
 from huggingface_hub import HfApi, create_repo
 
-# プロジェクトルート
+# プロジェクトルートを sys.path に追加（app.assets を import するため）
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
 
-# HuggingFace リポジトリ設定
-_HF_REPO_ID = "Haruto0321/tokyo-rent-predictor-data"
-_HF_REPO_TYPE = "dataset"
+from app.assets import ASSETS, HF_REPO_ID, HF_REPO_TYPE  # noqa: E402
 
-# アップロード対象ファイル: (ローカルパス, HF上のパス)
-_UPLOAD_FILES: list[tuple[Path, str]] = [
-    (_PROJECT_ROOT / "models" / "lgbm_model.pkl", "models/lgbm_model.pkl"),
-    (_PROJECT_ROOT / "outputs" / "test_predictions.csv", "outputs/test_predictions.csv"),
-    (
-        _PROJECT_ROOT / "outputs" / "test_predictions_properties.geojson",
-        "outputs/test_predictions_properties.geojson",
-    ),
-    (
-        _PROJECT_ROOT / "outputs" / "test_predictions_stations.geojson",
-        "outputs/test_predictions_stations.geojson",
-    ),
-]
+# アップロード対象: 共有マニフェスト（HF上パス, ローカルパス）を (ローカルパス, HF上パス) に並べ替える
+_UPLOAD_FILES: list[tuple[Path, str]] = [(local_path, hf_path) for hf_path, local_path in ASSETS]
 
 
 def main() -> None:
@@ -38,8 +28,8 @@ def main() -> None:
     api = HfApi()
 
     # リポジトリが存在しない場合は作成
-    create_repo(repo_id=_HF_REPO_ID, repo_type=_HF_REPO_TYPE, exist_ok=True)
-    print(f"リポジトリ確認済み: {_HF_REPO_ID}")
+    create_repo(repo_id=HF_REPO_ID, repo_type=HF_REPO_TYPE, exist_ok=True)
+    print(f"リポジトリ確認済み: {HF_REPO_ID}")
 
     for local_path, hf_path in _UPLOAD_FILES:
         if not local_path.exists():
@@ -50,13 +40,13 @@ def main() -> None:
         api.upload_file(
             path_or_fileobj=str(local_path),
             path_in_repo=hf_path,
-            repo_id=_HF_REPO_ID,
-            repo_type=_HF_REPO_TYPE,
+            repo_id=HF_REPO_ID,
+            repo_type=HF_REPO_TYPE,
         )
         print(f"完了: {hf_path}")
 
     print("\n全ファイルのアップロードが完了しました。")
-    print(f"確認URL: https://huggingface.co/datasets/{_HF_REPO_ID}")
+    print(f"確認URL: https://huggingface.co/datasets/{HF_REPO_ID}")
 
 
 if __name__ == "__main__":

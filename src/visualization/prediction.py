@@ -212,6 +212,55 @@ def divergence_band(ratio: float) -> str:
     return _SEVERE_BAND
 
 
+def assess_reliability(
+    comparison: dict[str, Any],
+    n_used: int,
+    min_similar: int = 10,
+) -> dict[str, Any]:
+    """査定の信頼度を 高 / 中 / 低 の 3 段階で判定する.
+
+    Phase 4（Streamlit 物件査定ページ）の信頼度バッジ用ロジック。
+    Quantile 区間と実証的区間の重なり・乖離バンド・類似物件数を総合して、
+    顧客に提示する信頼度ラベルとメッセージを返す。
+
+    判定基準:
+        - 低: 2 区間が重ならない、または乖離が重度（モデルが分布外を外挿）
+        - 中: 乖離が中度、または類似物件数が ``min_similar`` 未満（実証側が不安定）
+        - 高: 区間が重なり、乖離が軽度で、類似物件も十分
+
+    Args:
+        comparison: ``compare_intervals`` の戻り値（``quantile_median`` /
+            ``empirical_median`` / ``has_overlap`` を含む）。
+        n_used: 実証的区間に使った類似物件数。
+        min_similar: これ未満なら実証側が不安定とみなす類似物件数の下限。
+
+    Returns:
+        ``level``（高/中/低）・``band``・``direction``・``ratio``・``message`` を持つ辞書。
+    """
+    ratio = comparison["quantile_median"] / comparison["empirical_median"]
+    band = divergence_band(ratio)
+    direction = divergence_direction(ratio)
+    has_overlap = comparison["has_overlap"]
+
+    if not has_overlap or band == _SEVERE_BAND:
+        level = "低"
+        message = "モデル予測が実取引と大きく乖離。人手査定を推奨します。"
+    elif band == "中度" or n_used < min_similar:
+        level = "中"
+        message = "乖離または類似物件数に留意。参考値として扱ってください。"
+    else:
+        level = "高"
+        message = "モデル予測と実取引が整合しています。"
+
+    return {
+        "level": level,
+        "band": band,
+        "direction": direction,
+        "ratio": ratio,
+        "message": message,
+    }
+
+
 def add_interpretability_columns(table: pd.DataFrame) -> pd.DataFrame:
     """乖離度テーブルに解釈しやすい列を加える.
 
