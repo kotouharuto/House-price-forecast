@@ -11,7 +11,11 @@
       "Bash(gh pr *)",
       "Bash(git switch *)",
       "Bash(git add *)",
-      "Bash(uv run *)"
+      "Bash(uv run *)",
+      "mcp__visualize__read_me",
+      "mcp__visualize__show_widget",
+      "Bash(git check-ignore *)",
+      "Bash(awk '{print $5, $9}')"
     ]
   },
   "disabledMcpjsonServers": [

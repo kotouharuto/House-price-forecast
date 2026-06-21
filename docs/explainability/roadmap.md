@@ -108,7 +108,7 @@ LightGBM の `objective="quantile"` を使い、点推定だけでなく**統計
 
 ---
 
-## Phase 4: Streamlit ページ統合 ⬜
+## Phase 4: Streamlit ページ統合 ✅
 
 顧客向け査定書のレイアウトを Streamlit 上で提供する。**広い意味での production 化**。
 
@@ -126,7 +126,7 @@ LightGBM の `objective="quantile"` を使い、点推定だけでなく**統計
 - ✅ 査定信頼度の判定（高 / 中 / 低）— `assess_reliability()` を新規追加
 - ✅ 2区間（Quantile / 実証）を同一価格軸に並べた比較図
 - ✅ `home.py` の導線にリンク追加
-- ⬜ Streamlit Cloud 配信用に HF ダウンロード対象へ `features.csv` / 分位点モデルを追加（現状ローカル動作のみ）
+- ✅ Streamlit Cloud 配信用に HF ダウンロード対象へ `features.csv` / 分位点モデルを追加（現状ローカル動作のみ）
 
 ### 実装メモ
 - 取引データは `features.csv`（`取引年` を含む）を直接読み込む方式とし、当初想定の
