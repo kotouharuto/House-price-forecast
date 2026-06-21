@@ -7,6 +7,7 @@
 （融資判断・自動承認の閾値）や顧客説明（誠実な不確実性表示）の基盤となる。
 """
 
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +25,17 @@ logger = get_logger(__name__)
 LOWER_COL = "lower"
 MEDIAN_COL = "median"
 UPPER_COL = "upper"
+
+# 乖離度テーブルの列名（CSV 出力・評価で参照されるため定数化）
+DIVERGENCE_COL = "divergence"
+RATIO_COL = "ratio"
+
+# 中央値乖離度の既定の「高い」判定閾値（compare_intervals と揃える）
+DEFAULT_DIVERGENCE_THRESHOLD = 0.30
+
+# 重大度バンドの境界（fold = 1.0 からの倍率乖離。(境界未満, ラベル) の昇順）
+_BAND_BOUNDARIES: tuple[tuple[float, str], ...] = ((1.30, "軽度"), (2.00, "中度"))
+_SEVERE_BAND = "重度"
 
 # 想定する分位点数（low / median / high の 3 つ）
 _EXPECTED_NUM_QUANTILES = 3
@@ -156,7 +168,7 @@ def compare_intervals(
     has_overlap = overlap_lower <= overlap_upper
 
     return {
-        "divergence": divergence,
+        DIVERGENCE_COL: divergence,
         "is_reliable": is_reliable,
         "has_overlap": has_overlap,
         "flag": "高信頼" if is_reliable and has_overlap else "要人手査定",
@@ -164,3 +176,220 @@ def compare_intervals(
         "empirical_median": e_med,
         "n_similar_used": empirical_interval.get("n_used"),
     }
+
+
+def divergence_direction(ratio: float) -> str:
+    """倍率（ratio = quantile/empirical）から方向ラベルを返す.
+
+    Returns:
+        ``"高値"``（モデルが実取引より高い）/ ``"安値"`` / ``"一致"``。
+    """
+    if ratio > 1.0:
+        return "高値"
+    if ratio < 1.0:
+        return "安値"
+    return "一致"
+
+
+def divergence_band(ratio: float) -> str:
+    """倍率から重大度バンド（軽度 / 中度 / 重度）を返す.
+
+    高値側（ratio>1）と安値側（ratio<1）を対称に扱うため、
+    ``fold = max(ratio, 1/ratio)``（常に 1.0 以上の「離れ具合」）で評価する。
+
+    Args:
+        ratio: ``quantile_median / empirical_median``（正の値）。
+
+    Raises:
+        ValueError: ``ratio`` が 0 以下の場合。
+    """
+    if ratio <= 0:
+        raise ValueError(f"ratio は正の値である必要があります: {ratio}")
+    fold = max(ratio, 1.0 / ratio)
+    for boundary, label in _BAND_BOUNDARIES:
+        if fold < boundary:
+            return label
+    return _SEVERE_BAND
+
+
+def add_interpretability_columns(table: pd.DataFrame) -> pd.DataFrame:
+    """乖離度テーブルに解釈しやすい列を加える.
+
+    ``quantile_median`` / ``empirical_median`` から、倍率・符号付き乖離率・
+    方向・重大度バンドを算出する。``divergence``（絶対値）より直感的に
+    「どちらへどれだけ外れているか」を読めるようにするための列群。
+
+    Args:
+        table: ``quantile_median`` と ``empirical_median`` 列を持つ DataFrame。
+
+    Returns:
+        ``ratio``・``signed_pct``・``direction``・``band`` を追加した新しい DataFrame。
+        空テーブルの場合は当該列を空で付与して返す。
+    """
+    out = table.copy()
+    if out.empty:
+        for col in (RATIO_COL, "signed_pct", "direction", "band"):
+            out[col] = pd.Series(dtype="object" if col in ("direction", "band") else "float64")
+        return out
+
+    q = out["quantile_median"].astype(float)
+    e = out["empirical_median"].astype(float)
+    out[RATIO_COL] = q / e
+    out["signed_pct"] = (q - e) / e * 100.0  # 符号付き: + ならモデルが高い
+    out["direction"] = out[RATIO_COL].map(divergence_direction)
+    out["band"] = out[RATIO_COL].map(divergence_band)
+    return out
+
+
+def build_divergence_table(
+    df: pd.DataFrame,
+    models: dict[float, LGBMRegressor],
+    model_features: Sequence[str],
+    n_similar: int = 30,
+    divergence_threshold: float = DEFAULT_DIVERGENCE_THRESHOLD,
+    id_columns: Sequence[str] = (),
+    return_yen: bool = True,
+) -> pd.DataFrame:
+    """全物件について Quantile中央値 と 実証中央値 の乖離度テーブルを作る.
+
+    Quantile Regression（Phase 2）の予測中央値と、類似物件の実取引価格から
+    求めた中央値（Phase 3）の相対乖離を物件ごとに算出する。乖離が大きい物件は
+    「モデルが学習データの分布外を外挿している」サインとして人手査定の対象になる。
+
+    Args:
+        df: 全取引データ（``model_features`` と類似物件検索に必要な列を含む）。
+        models: ``{alpha: 学習済み LGBMRegressor}`` の辞書。3 件必要。
+        model_features: モデルが期待する特徴量列の順序付きリスト。
+        n_similar: 実証的区間に使う類似物件数。
+        divergence_threshold: ``flag`` 判定に使う乖離度の閾値。
+        id_columns: 出力に含める識別用の列（市区町村コード・面積など）。
+        return_yen: Quantile 予測を円換算するか（実証中央値は常に円）。
+
+    Returns:
+        ``index``・``id_columns``・``divergence``・``quantile_median``・
+        ``empirical_median``・``has_overlap``・``n_used``・``flag`` を持つ DataFrame。
+        実証中央値が 0 以下の行（類似物件が存在しない等）は除外する。
+    """
+    intervals = predict_with_interval(models, df[list(model_features)], return_yen=return_yen)
+
+    records: list[dict[str, Any]] = []
+    skipped = 0
+    for idx in df.index:
+        empirical = empirical_interval_from_similar(df, idx, n_similar=n_similar)
+        # 実証中央値が 0 以下なら比較不能なのでスキップ（compare_intervals は raise する）
+        if empirical[MEDIAN_COL] <= 0:
+            skipped += 1
+            continue
+
+        quantile = {
+            LOWER_COL: float(intervals.at[idx, LOWER_COL]),
+            MEDIAN_COL: float(intervals.at[idx, MEDIAN_COL]),
+            UPPER_COL: float(intervals.at[idx, UPPER_COL]),
+        }
+        comparison = compare_intervals(quantile, empirical, divergence_threshold)
+
+        records.append(
+            {
+                "index": idx,
+                **{col: df.at[idx, col] for col in id_columns},
+                DIVERGENCE_COL: comparison[DIVERGENCE_COL],
+                "quantile_median": comparison["quantile_median"],
+                "empirical_median": comparison["empirical_median"],
+                "has_overlap": comparison["has_overlap"],
+                "n_used": empirical["n_used"],
+                "flag": comparison["flag"],
+            }
+        )
+
+    logger.info(f"乖離度テーブル作成: {len(records)} 件（スキップ {skipped} 件）")
+    return add_interpretability_columns(pd.DataFrame.from_records(records))
+
+
+def filter_high_divergence(
+    table: pd.DataFrame,
+    threshold: float = DEFAULT_DIVERGENCE_THRESHOLD,
+) -> pd.DataFrame:
+    """乖離度テーブルから閾値を超える物件を乖離度の降順で抽出する.
+
+    Args:
+        table: ``build_divergence_table`` が返すテーブル。
+        threshold: この値を超える物件を「高乖離」として抽出する。
+
+    Returns:
+        ``divergence > threshold`` の行を乖離度降順に並べた DataFrame。
+    """
+    high = table[table[DIVERGENCE_COL] > threshold]
+    return high.sort_values(DIVERGENCE_COL, ascending=False).reset_index(drop=True)
+
+
+# 市区町村集計の既定列名・集計キー
+COUNT_COL = "件数"
+RATIO_MEDIAN_COL = "ratio_median"
+OVER_RATE_COL = "over_rate"
+NAME_COL = "市区町村名"
+_MUNICIPALITY_CODE_COL = "市区町村コード"
+
+# 集計の並び替えモード（high: ratio 降順 / low: ratio 昇順）
+_VALID_MODES = ("high", "low")
+
+
+def aggregate_divergence_by_municipality(
+    table: pd.DataFrame,
+    mode: str = "high",
+    municipality_column: str = _MUNICIPALITY_CODE_COL,
+    ratio_column: str = RATIO_COL,
+    min_count: int = 10,
+    name_by_code: dict[int, str] | None = None,
+) -> pd.DataFrame:
+    """乖離度テーブルを市区町村ごとに集計し、高乖離 / 低乖離の傾向順に並べる.
+
+    各市区町村について件数・``ratio`` 中央値・モデル高値割合（``ratio > 1`` の比率）を
+    集計する。``ratio = quantile_median / empirical_median`` なので、中央値が大きい
+    市区町村ほど「モデルが実取引より高値を出しがち」と読める。
+
+    Args:
+        table: ``ratio`` 列と市区町村コード列を持つ DataFrame
+            （``build_divergence_table`` の出力や、その CSV 読み込み結果を想定）。
+        mode: ``"high"`` なら ``ratio`` 中央値の降順（モデル高値の地域を上位に）、
+            ``"low"`` なら昇順（モデル安値の地域を上位に）。
+        municipality_column: 集計キーとなる市区町村コード列名。
+        ratio_column: 倍率列名。
+        min_count: この件数未満の市区町村は除外する（少数によるノイズを抑える）。
+        name_by_code: 市区町村コード → 名称の辞書。渡すと ``市区町村名`` 列を付与する。
+
+    Returns:
+        市区町村ごとの集計テーブル（``市区町村コード`` / ``件数`` /
+        ``ratio_median`` / ``over_rate`` と、辞書を渡した場合は ``市区町村名``）。
+        ``mode`` に応じて整列済み。
+
+    Raises:
+        ValueError: ``mode`` が ``"high"`` / ``"low"`` 以外の場合。
+        KeyError: 必須列（市区町村コード / ratio）が ``table`` に無い場合。
+    """
+    if mode not in _VALID_MODES:
+        raise ValueError(f"mode は {_VALID_MODES} のいずれかです: got {mode!r}")
+
+    missing = [c for c in (municipality_column, ratio_column) if c not in table.columns]
+    if missing:
+        raise KeyError(f"集計に必要な列がありません: {missing}")
+
+    agg = (
+        table.groupby(municipality_column)
+        .agg(
+            **{
+                COUNT_COL: (ratio_column, "size"),
+                RATIO_MEDIAN_COL: (ratio_column, "median"),
+                OVER_RATE_COL: (ratio_column, lambda s: float((s > 1.0).mean() * 100)),
+            }
+        )
+        .reset_index()
+    )
+
+    agg = agg[agg[COUNT_COL] >= min_count]
+    # mode="low" のときだけ昇順（安値方向を上位に）
+    agg = agg.sort_values(RATIO_MEDIAN_COL, ascending=(mode == "low")).reset_index(drop=True)
+
+    if name_by_code is not None:
+        agg[NAME_COL] = agg[municipality_column].map(lambda c: name_by_code.get(int(c), str(c)))
+
+    return agg

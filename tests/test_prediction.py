@@ -9,11 +9,23 @@ import pytest
 from lightgbm import LGBMRegressor
 
 from src.visualization.prediction import (
+    COUNT_COL,
+    DIVERGENCE_COL,
     LOWER_COL,
     MEDIAN_COL,
+    NAME_COL,
+    OVER_RATE_COL,
+    RATIO_COL,
+    RATIO_MEDIAN_COL,
     UPPER_COL,
+    add_interpretability_columns,
+    aggregate_divergence_by_municipality,
+    build_divergence_table,
     compare_intervals,
+    divergence_band,
+    divergence_direction,
     empirical_interval_from_similar,
+    filter_high_divergence,
     load_quantile_models,
     predict_with_interval,
 )
@@ -269,3 +281,269 @@ def test_compare_intervals_raises_on_nonpositive_empirical_median() -> None:
 
     with pytest.raises(ValueError, match="実証中央値"):
         compare_intervals(quantile_interval, empirical_interval)
+
+
+# ============================================================
+# 乖離度テーブル（build_divergence_table / filter_high_divergence）
+# ============================================================
+
+
+def _make_divergence_df(n_rows: int = 8, seed: int = 1) -> pd.DataFrame:
+    """乖離度テーブルテスト用の DataFrame.
+
+    全行が同一の種類・市区町村コードを持つため、各行は他の全行を類似候補とする。
+    モデル特徴量 (a/b/c) と類似物件検索に必要な列を併せ持つ。
+    """
+    rng = np.random.default_rng(seed)
+    features = pd.DataFrame(rng.normal(size=(n_rows, 3)), columns=["a", "b", "c"])
+    return features.assign(
+        種類=["中古マンション等"] * n_rows,
+        市区町村コード=[13112] * n_rows,
+        面積=np.linspace(50.0, 80.0, n_rows),
+        築年数=np.linspace(5.0, 30.0, n_rows),
+        最寄駅_距離=np.linspace(3.0, 12.0, n_rows),
+        取引年=[2024] * n_rows,
+        取引四半期=[1] * n_rows,
+        取引価格=np.linspace(30_000_000, 80_000_000, n_rows),
+    ).rename(
+        columns={
+            "面積": "面積（㎡）",
+            "最寄駅_距離": "最寄駅：距離（分）",
+            "取引価格": "取引価格（総額）",
+        }
+    )
+
+
+def test_build_divergence_table_has_expected_columns() -> None:
+    """テーブルに識別列と乖離度・フラグ列が揃っていること."""
+    models = _train_tiny_quantile_models()
+    df = _make_divergence_df()
+
+    table = build_divergence_table(
+        df,
+        models,
+        model_features=["a", "b", "c"],
+        n_similar=5,
+        id_columns=["市区町村コード", "面積（㎡）"],
+    )
+
+    assert len(table) == len(df)
+    for col in (
+        "index",
+        "市区町村コード",
+        "面積（㎡）",
+        DIVERGENCE_COL,
+        RATIO_COL,
+        "signed_pct",
+        "direction",
+        "band",
+        "quantile_median",
+        "empirical_median",
+        "n_used",
+        "flag",
+    ):
+        assert col in table.columns
+    # 乖離度は非負、フラグは 2 値のいずれか
+    assert (table[DIVERGENCE_COL] >= 0).all()
+    assert table["flag"].isin(["高信頼", "要人手査定"]).all()
+    # ratio と divergence は |ratio - 1| == divergence の関係
+    np.testing.assert_allclose(
+        (table[RATIO_COL] - 1.0).abs().to_numpy(),
+        table[DIVERGENCE_COL].to_numpy(),
+        rtol=1e-9,
+    )
+
+
+def test_filter_high_divergence_sorts_descending_and_filters() -> None:
+    """閾値超の行のみを乖離度降順で返すこと."""
+    table = pd.DataFrame(
+        {
+            "index": [0, 1, 2, 3],
+            DIVERGENCE_COL: [0.05, 0.45, 0.30, 0.60],
+        }
+    )
+
+    result = filter_high_divergence(table, threshold=0.30)
+
+    # 0.30 は「超える」ではないので除外、0.45 と 0.60 が残る
+    assert result["index"].tolist() == [3, 1]
+    assert result[DIVERGENCE_COL].tolist() == [0.60, 0.45]
+
+
+def test_filter_high_divergence_empty_when_all_below() -> None:
+    """全行が閾値以下なら空の DataFrame を返すこと."""
+    table = pd.DataFrame({"index": [0, 1], DIVERGENCE_COL: [0.10, 0.20]})
+
+    result = filter_high_divergence(table, threshold=0.30)
+
+    assert result.empty
+
+
+# ============================================================
+# 解釈用列（ratio / signed_pct / direction / band）
+# ============================================================
+
+
+def test_divergence_direction_labels() -> None:
+    """ratio から高値 / 安値 / 一致が正しく判定されること."""
+    assert divergence_direction(1.30) == "高値"
+    assert divergence_direction(0.70) == "安値"
+    assert divergence_direction(1.00) == "一致"
+
+
+def test_divergence_band_is_symmetric_for_high_and_low() -> None:
+    """高値側・安値側で対称にバンド判定されること（fold ベース）."""
+    # 2倍 と 半額 はどちらも fold=2.0 → 重度
+    assert divergence_band(2.0) == "重度"
+    assert divergence_band(0.5) == "重度"
+    # 1.3倍未満 は軽度、1.3〜2.0倍 は中度
+    assert divergence_band(1.2) == "軽度"
+    assert divergence_band(1.5) == "中度"
+    # 対称: 1/1.5 ≒ 0.667 も中度
+    assert divergence_band(1.0 / 1.5) == "中度"
+
+
+def test_divergence_band_raises_on_nonpositive_ratio() -> None:
+    """ratio が 0 以下なら ValueError."""
+    with pytest.raises(ValueError, match="ratio"):
+        divergence_band(0.0)
+
+
+def test_add_interpretability_columns_values() -> None:
+    """ratio / signed_pct / direction / band が中央値から正しく算出されること."""
+    table = pd.DataFrame(
+        {
+            "quantile_median": [12_000_000, 3_500_000],
+            "empirical_median": [10_000_000, 7_000_000],
+        }
+    )
+
+    result = add_interpretability_columns(table)
+
+    # 1行目: 1200万 / 1000万 = 1.2倍, +20%, 高値, 軽度
+    assert result.loc[0, RATIO_COL] == pytest.approx(1.20)
+    assert result.loc[0, "signed_pct"] == pytest.approx(20.0)
+    assert result.loc[0, "direction"] == "高値"
+    assert result.loc[0, "band"] == "軽度"
+    # 2行目: 350万 / 700万 = 0.5倍, -50%, 安値, 重度
+    assert result.loc[1, RATIO_COL] == pytest.approx(0.50)
+    assert result.loc[1, "signed_pct"] == pytest.approx(-50.0)
+    assert result.loc[1, "direction"] == "安値"
+    assert result.loc[1, "band"] == "重度"
+
+
+def test_add_interpretability_columns_handles_empty() -> None:
+    """空テーブルでも列を付与して返すこと."""
+    table = pd.DataFrame({"quantile_median": [], "empirical_median": []})
+
+    result = add_interpretability_columns(table)
+
+    for col in (RATIO_COL, "signed_pct", "direction", "band"):
+        assert col in result.columns
+    assert result.empty
+
+
+# ============================================================
+# 市区町村別の乖離集計（aggregate_divergence_by_municipality）
+# ============================================================
+
+
+def _make_divergence_table() -> pd.DataFrame:
+    """市区町村集計テスト用の乖離度テーブルを生成する.
+
+    13101: ratio が高め（モデル高値傾向） / 13109: ratio が低め（モデル安値傾向） /
+    13999: 件数が少ない（min_count フィルタ確認用）。
+    """
+    return pd.DataFrame(
+        {
+            "市区町村コード": [13101, 13101, 13101, 13109, 13109, 13109, 13999],
+            RATIO_COL: [1.5, 1.4, 1.6, 0.7, 0.8, 0.6, 2.0],
+        }
+    )
+
+
+def test_aggregate_high_mode_sorts_by_ratio_desc() -> None:
+    """mode='high' で ratio 中央値の降順に並ぶこと."""
+    table = _make_divergence_table()
+
+    result = aggregate_divergence_by_municipality(table, mode="high", min_count=3)
+
+    # 13101（中央値 1.5）が 13109（中央値 0.7）より上位
+    assert list(result["市区町村コード"]) == [13101, 13109]
+    assert result[RATIO_MEDIAN_COL].is_monotonic_decreasing
+
+
+def test_aggregate_low_mode_sorts_by_ratio_asc() -> None:
+    """mode='low' で ratio 中央値の昇順に並ぶこと."""
+    table = _make_divergence_table()
+
+    result = aggregate_divergence_by_municipality(table, mode="low", min_count=3)
+
+    # 安値傾向の 13109 が上位
+    assert list(result["市区町村コード"]) == [13109, 13101]
+    assert result[RATIO_MEDIAN_COL].is_monotonic_increasing
+
+
+def test_aggregate_respects_min_count() -> None:
+    """min_count 未満の市区町村が除外されること."""
+    table = _make_divergence_table()
+
+    result = aggregate_divergence_by_municipality(table, min_count=3)
+
+    # 13999 は 1 件なので除外される
+    assert 13999 not in set(result["市区町村コード"])
+    assert set(result["市区町村コード"]) == {13101, 13109}
+
+
+def test_aggregate_columns_and_over_rate() -> None:
+    """集計列が揃い、over_rate が ratio>1 の割合になっていること."""
+    table = _make_divergence_table()
+
+    result = aggregate_divergence_by_municipality(table, min_count=3)
+
+    for col in (COUNT_COL, RATIO_MEDIAN_COL, OVER_RATE_COL):
+        assert col in result.columns
+    # 13101 は 3 件すべて ratio>1 → over_rate 100%、13109 は 0%
+    row_13101 = result[result["市区町村コード"] == 13101].iloc[0]
+    row_13109 = result[result["市区町村コード"] == 13109].iloc[0]
+    assert row_13101[COUNT_COL] == 3
+    assert row_13101[OVER_RATE_COL] == pytest.approx(100.0)
+    assert row_13109[OVER_RATE_COL] == pytest.approx(0.0)
+
+
+def test_aggregate_adds_name_when_dict_given() -> None:
+    """name_by_code を渡すと市区町村名列が付与されること."""
+    table = _make_divergence_table()
+    name_by_code = {13101: "千代田区", 13109: "品川区"}
+
+    result = aggregate_divergence_by_municipality(table, min_count=3, name_by_code=name_by_code)
+
+    assert NAME_COL in result.columns
+    assert set(result[NAME_COL]) == {"千代田区", "品川区"}
+
+
+def test_aggregate_unknown_code_falls_back_to_code_string() -> None:
+    """辞書に無いコードは文字列化したコードで埋められること."""
+    table = _make_divergence_table()
+    name_by_code = {13101: "千代田区"}  # 13109 は欠落
+
+    result = aggregate_divergence_by_municipality(table, min_count=3, name_by_code=name_by_code)
+
+    name_13109 = result[result["市区町村コード"] == 13109][NAME_COL].iloc[0]
+    assert name_13109 == "13109"
+
+
+def test_aggregate_raises_on_invalid_mode() -> None:
+    """mode が high/low 以外で ValueError."""
+    table = _make_divergence_table()
+
+    with pytest.raises(ValueError, match="mode"):
+        aggregate_divergence_by_municipality(table, mode="middle")
+
+
+def test_aggregate_raises_when_required_column_missing() -> None:
+    """必須列が無いとき KeyError."""
+    table = pd.DataFrame({"市区町村コード": [13101, 13101]})  # ratio が無い
+
+    with pytest.raises(KeyError, match=RATIO_COL):
+        aggregate_divergence_by_municipality(table)

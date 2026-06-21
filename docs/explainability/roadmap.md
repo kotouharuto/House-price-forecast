@@ -90,7 +90,7 @@ LightGBM の `objective="quantile"` を使い、点推定だけでなく**統計
 
 ---
 
-## Phase 3: 類似物件からの実証的区間 ⬜
+## Phase 3: 類似物件からの実証的区間 ✅
 
 過去取引の**事実データ**から、対象物件の予測区間を統計的に出す。Phase 1 の関数を再利用するだけで概ね実装可能。
 
@@ -102,9 +102,9 @@ LightGBM の `objective="quantile"` を使い、点推定だけでなく**統計
 ### タスク
 - ✅ `src/visualization/prediction.py` に `empirical_interval_from_similar()` 関数追加
 - ✅ パラメータ: `n_similar`（既定 30）、`lower_q` / `upper_q`（既定 0.10 / 0.90）
-- ✅Quantile 区間と実証的区間を並べて返す統合関数 `compare_intervals()`
+- ✅ Quantile 区間と実証的区間を並べて返す統合関数 `compare_intervals()`
 - ✅ テスト追加（小規模 DataFrame で分位点が想定通り出ること）
-- ⬜ ノートブック `05_property_appraisal.ipynb` で可視化プロトタイプ
+- ✅ ノートブック `05_property_appraisal.ipynb` で可視化プロトタイプ
 
 ---
 
