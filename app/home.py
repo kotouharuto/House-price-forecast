@@ -15,6 +15,7 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
+from app.assets import download_assets  # noqa: E402
 from src.visualization.aggregate import (  # noqa: E402
     load_predictions,
     metrics_by_price_band,
@@ -28,65 +29,6 @@ st.set_page_config(
     page_icon="🏠",
     layout="wide",
 )
-
-# ---------- Streamlit Cloud 用のアセット自動ダウンロード ----------
-# HuggingFace Hub に置いた学習済みモデル・予測結果ファイルを、ローカルに無ければ取得する。
-# 既存ファイルがある（ローカル開発）場合はスキップ。
-_HF_REPO_ID = "Haruto0321/tokyo-rent-predictor-data"
-_DOWNLOAD_FILES: list[tuple[str, Path]] = [
-    ("models/lgbm_model.pkl", _PROJECT_ROOT / "models" / "lgbm_model.pkl"),
-    ("outputs/test_predictions.csv", _PROJECT_ROOT / "outputs" / "test_predictions.csv"),
-    (
-        "outputs/test_predictions_properties.geojson",
-        _PROJECT_ROOT / "outputs" / "test_predictions_properties.geojson",
-    ),
-    (
-        "outputs/test_predictions_stations.geojson",
-        _PROJECT_ROOT / "outputs" / "test_predictions_stations.geojson",
-    ),
-]
-
-
-def _get_hf_token() -> str | None:
-    """Streamlit Secrets から HF_TOKEN を取得する（無ければ None）.
-
-    ローカル開発環境では ``.streamlit/secrets.toml`` が無い・無設定でも動くよう、
-    例外を握りつぶして匿名アクセス（``token=None``）にフォールバックする。
-    """
-    try:
-        return st.secrets["HF_TOKEN"]
-    except (FileNotFoundError, KeyError, AttributeError):
-        return None
-
-
-@st.cache_resource(show_spinner="データを準備しています...")
-def _download_assets() -> None:
-    """HuggingFace Hub から必要なファイルをダウンロードする.
-
-    Private リポジトリの場合は Streamlit Secrets の ``HF_TOKEN`` を利用する。
-    既にローカルに存在する場合はスキップする（ローカル開発環境への配慮）。
-    """
-    import shutil
-
-    from huggingface_hub import hf_hub_download
-
-    token = _get_hf_token()
-
-    for hf_path, local_path in _DOWNLOAD_FILES:
-        if local_path.exists():
-            continue
-
-        local_path.parent.mkdir(parents=True, exist_ok=True)
-        downloaded = hf_hub_download(
-            repo_id=_HF_REPO_ID,
-            filename=hf_path,
-            repo_type="dataset",
-            local_dir=str(_PROJECT_ROOT),
-            token=token,
-        )
-        # hf_hub_download はキャッシュディレクトリに置くため、指定パスへコピー
-        if Path(downloaded) != local_path:
-            shutil.copy2(downloaded, local_path)
 
 
 @st.cache_data
@@ -209,7 +151,7 @@ def _render_band_summary(df: pd.DataFrame) -> None:
 def _render_navigation() -> None:
     """各ページへの導線をボタン状に表示する."""
     st.subheader("各ページへの導線")
-    cols = st.columns(3)
+    cols = st.columns(4)
     with cols[0]:
         st.markdown(
             """
@@ -233,13 +175,21 @@ def _render_navigation() -> None:
             各指標の定義・計算式・読み方・業界基準との比較。
             """
         )
+    with cols[3]:
+        st.markdown(
+            """
+            ### 物件査定
+            点予測＋予測区間＋類似物件の実取引区間を統合表示。
+            査定信頼度を高/中/低で判定。
+            """
+        )
     st.info("左サイドバーの『Pages』からそれぞれのページへ移動できます。")
 
 
 def main() -> None:
     """エントリポイント."""
     # Streamlit Cloud では HuggingFace Hub からアセットを事前取得（ローカルなら即帰る）
-    _download_assets()
+    download_assets()
 
     _render_overview()
     st.divider()

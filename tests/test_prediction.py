@@ -20,6 +20,7 @@ from src.visualization.prediction import (
     UPPER_COL,
     add_interpretability_columns,
     aggregate_divergence_by_municipality,
+    assess_reliability,
     build_divergence_table,
     compare_intervals,
     divergence_band,
@@ -547,3 +548,66 @@ def test_aggregate_raises_when_required_column_missing() -> None:
 
     with pytest.raises(KeyError, match=RATIO_COL):
         aggregate_divergence_by_municipality(table)
+
+
+# ============================================================
+# 査定信頼度判定（assess_reliability）
+# ============================================================
+
+
+def _comparison(quantile_median: float, empirical_median: float, has_overlap: bool) -> dict:
+    """assess_reliability テスト用の compare_intervals 風の辞書を作る."""
+    return {
+        "quantile_median": quantile_median,
+        "empirical_median": empirical_median,
+        "has_overlap": has_overlap,
+    }
+
+
+def test_assess_reliability_high_when_close_and_overlap() -> None:
+    """区間が重なり乖離が軽度・類似十分なら『高』."""
+    comparison = _comparison(5_100, 5_000, has_overlap=True)  # ratio 1.02
+
+    result = assess_reliability(comparison, n_used=30)
+
+    assert result["level"] == "高"
+    assert result["band"] == "軽度"
+    assert result["direction"] == "高値"
+
+
+def test_assess_reliability_medium_when_few_similar() -> None:
+    """軽度でも類似物件数が下限未満なら『中』."""
+    comparison = _comparison(5_100, 5_000, has_overlap=True)  # ratio 1.02（軽度）
+
+    result = assess_reliability(comparison, n_used=5, min_similar=10)
+
+    assert result["level"] == "中"
+
+
+def test_assess_reliability_medium_when_band_is_moderate() -> None:
+    """乖離が中度なら（重なりがあっても）『中』."""
+    comparison = _comparison(7_500, 5_000, has_overlap=True)  # ratio 1.5（中度）
+
+    result = assess_reliability(comparison, n_used=30)
+
+    assert result["level"] == "中"
+    assert result["band"] == "中度"
+
+
+def test_assess_reliability_low_when_severe() -> None:
+    """乖離が重度なら『低』."""
+    comparison = _comparison(15_000, 5_000, has_overlap=True)  # ratio 3.0（重度）
+
+    result = assess_reliability(comparison, n_used=30)
+
+    assert result["level"] == "低"
+    assert result["band"] == "重度"
+
+
+def test_assess_reliability_low_when_no_overlap() -> None:
+    """区間が重ならなければ（乖離が軽度でも）『低』."""
+    comparison = _comparison(5_100, 5_000, has_overlap=False)  # ratio 1.02（軽度）
+
+    result = assess_reliability(comparison, n_used=30)
+
+    assert result["level"] == "低"
