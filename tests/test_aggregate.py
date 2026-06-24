@@ -8,12 +8,15 @@ import pytest
 
 from src.visualization.aggregate import (
     _DEFAULT_PRED_PATH,
+    INTERVAL_WIDTH_COL,
+    PRED_PRICE_COL,
     aggregate_by_station,
     aggregate_by_ward,
     aggregate_predictions,
     available_stations,
     default_predictions_path,
     filter_predictions,
+    flag_wide_intervals,
     load_predictions,
     metrics_by_price_band,
     percent_error_rates,
@@ -404,3 +407,63 @@ def test_metrics_by_price_band_empty_returns_empty_df() -> None:
 
     assert len(result) == 0
     assert {"count", "median_ape", "mape", "pe10", "pe20"}.issubset(result.columns)
+
+
+def _make_interval_df() -> pd.DataFrame:
+    """OODフラグ用の最小データ（予測価格と区間幅）."""
+    return pd.DataFrame(
+        {
+            PRED_PRICE_COL: [10_000_000, 10_000_000, 10_000_000, 50_000_000],
+            INTERVAL_WIDTH_COL: [12_000_000, 5_000_000, 10_000_000, 20_000_000],
+        },
+        index=[5, 12, 30, 41],  # 非連番indexで整合確認
+    )
+
+
+def test_flag_wide_intervals_relative_threshold() -> None:
+    """相対幅 > しきい値(既定1.0) の行のみ True になること."""
+    df = _make_interval_df()
+
+    flag = flag_wide_intervals(df)
+
+    # 1.2倍→True, 0.5倍→False, 1.0倍ちょうど→False(厳密>), 0.4倍→False
+    assert flag.tolist() == [True, False, False, False]
+    assert list(flag.index) == [5, 12, 30, 41]  # index整合
+
+
+def test_flag_wide_intervals_custom_threshold() -> None:
+    """しきい値を下げるとフラグ対象が増えること."""
+    df = _make_interval_df()
+
+    flag = flag_wide_intervals(df, threshold=0.4)
+
+    # 1.2 / 0.5 / 1.0 / 0.4 のうち 0.4 は厳密>で除外 → 先頭3件
+    assert flag.tolist() == [True, True, True, False]
+
+
+def test_flag_wide_intervals_nonpositive_reference_is_false() -> None:
+    """参照価格が 0 以下の行は判定不能として False."""
+    df = pd.DataFrame({PRED_PRICE_COL: [0, -1], INTERVAL_WIDTH_COL: [5_000_000, 5_000_000]})
+
+    flag = flag_wide_intervals(df)
+
+    assert flag.tolist() == [False, False]
+
+
+def test_flag_wide_intervals_missing_columns_all_false() -> None:
+    """必要な列が無ければ全 False を返す（例外を出さない）."""
+    df = pd.DataFrame({PRED_PRICE_COL: [10_000_000, 20_000_000]})  # 幅列なし
+
+    flag = flag_wide_intervals(df)
+
+    assert flag.tolist() == [False, False]
+    assert len(flag) == len(df)
+
+
+def test_flag_wide_intervals_empty_df() -> None:
+    """空データフレームでも空の Series を返すこと."""
+    df = pd.DataFrame({PRED_PRICE_COL: [], INTERVAL_WIDTH_COL: []})
+
+    flag = flag_wide_intervals(df)
+
+    assert flag.empty

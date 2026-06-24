@@ -69,18 +69,21 @@ def evaluate_regression(y_true_log: pd.Series, y_pred_log: np.ndarray) -> dict[s
     }
 
 
-def prepare_dataset() -> tuple[pd.DataFrame, pd.Series]:
-    """前処理パイプラインを実行し、特徴量 X と目的変数 y（log スケール）を返す.
+def prepare_dataset_with_frame() -> tuple[pd.DataFrame, pd.DataFrame, pd.Series]:
+    """前処理を実行し、(全列 df, 特徴量 X, 目的変数 y) を返す.
+
+    ``X`` / ``y`` は学習用、``df`` は取引価格列など表示・分析用の列も保持する
+    全列版。テスト予測 CSV 生成（区間予測付与）で全列が必要なため切り出した。
 
     Returns:
-        ``(X, y)`` のタプル。``y`` は log 変換済みの取引価格。
-        取引価格列（生・log 両方）はリーク防止のため X から除外する。
+        ``(df, X, y)``。``df`` は ``X`` と同じ index を持ち、取引価格（生・log）や
+        取引年も含む。``y`` は log 変換済みの取引価格。
     """
     df = run_pipeline()
 
     df[_TARGET_COLUMN] = pd.to_numeric(df[_TARGET_COLUMN], errors="coerce")
     # 0 以下の値は対数変換できないので除外
-    df = df[df[_TARGET_COLUMN] > 0]
+    df = df[df[_TARGET_COLUMN] > 0].copy()
     df[_LOG_TARGET_COLUMN] = np.log(df[_TARGET_COLUMN])
 
     # 目的変数はリークになるため特徴量から除外する。
@@ -89,6 +92,17 @@ def prepare_dataset() -> tuple[pd.DataFrame, pd.Series]:
     drop_columns = [c for c in drop_columns if c in df.columns]
     x = df.drop(columns=drop_columns)
     y = df[_LOG_TARGET_COLUMN]
+    return df, x, y
+
+
+def prepare_dataset() -> tuple[pd.DataFrame, pd.Series]:
+    """前処理パイプラインを実行し、特徴量 X と目的変数 y（log スケール）を返す.
+
+    Returns:
+        ``(X, y)`` のタプル。``y`` は log 変換済みの取引価格。
+        取引価格列（生・log 両方）はリーク防止のため X から除外する。
+    """
+    _, x, y = prepare_dataset_with_frame()
     return x, y
 
 

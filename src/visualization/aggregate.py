@@ -63,6 +63,15 @@ _REQUIRED_COLUMNS: tuple[str, ...] = (
     YAMANOTE_COL,
 )
 
+# 区間予測の列名（予測区間の評価で参照）
+PRED_LOWER_COL = "pred_lower_yen"
+PRED_MEDIAN_COL = "pred_median_yen"
+PRED_UPPER_COL = "pred_upper_yen"
+INTERVAL_WIDTH_COL = "interval_width_yen"
+
+# 名目カバレッジ（α=0.05/0.95 → 90%）。aggregate はモデルを持たないため定数化
+DEFAULT_NOMINAL_COVERAGE = 90.0
+
 
 def default_predictions_path() -> Path:
     """予測結果CSVの既定パスを返す.
@@ -483,3 +492,163 @@ def metrics_by_price_band(df: pd.DataFrame) -> pd.DataFrame:
         .reset_index()
     )
     return result
+
+
+# === 区間評価関数の追加 ===
+
+# PICP
+def coverage_rate(df, lower_col=PRED_LOWER_COL, upper_col=PRED_UPPER_COL,
+                  actual_col=ACTUAL_PRICE_COL
+) -> float:
+    """実価格が予測区間 [lower, upper] に入る割合（PICP, %）を返す。
+    予測区間の品質指標。名目カバレッジ（区間生成時のα）に近いほど較正が良い。
+    空データ・区間列が無い場合は NaN を返す（区間列を持たない CSV でも落ちない）。
+
+    Args:
+        df: 予測結果のデータフレーム。
+        lower_col: 区間下限の列名（円）。
+        upper_col: 区間上限の列名（円）。
+        actual_col: 実取引価格の列名（円）。
+
+    Returns:
+        区間内に収まった割合（%）。対象行が無ければ NaN。
+    """
+    required = (lower_col, upper_col, actual_col)
+    if len(df) == 0 or not set(required).issubset(df.columns):
+        return float("nan")
+
+    # 3列のいずれかが欠損する行は分母から除外（NaN比較による過少評価を防ぐ）
+    sub = df[list(required)].dropna()
+    if len(sub) == 0:
+        return float("nan")
+
+    actual = sub[actual_col].to_numpy(dtype=float)
+    lower = sub[lower_col].to_numpy(dtype=float)
+    upper = sub[upper_col].to_numpy(dtype=float)
+
+    # 両端を含む（actual == lower / == upper も区間内とみなす）
+    inside = (actual >= lower) & (actual <= upper)
+    return float(inside.mean() * 100)
+
+
+# PIAW
+def interval_width_stats(
+    df: pd.DataFrame,
+    lower_col: str = PRED_LOWER_COL,
+    upper_col: str = PRED_UPPER_COL,
+) -> dict[str, float]:
+    """予測区間幅（円）の中央値・平均（PIAW）を算出する.
+
+    区間幅は ``upper - lower`` を都度計算する（CSV の派生列に依存しない）。
+    狭いほど有用だが、狭すぎると PICP が下がるトレードオフがある。
+
+    Args:
+        df: 予測結果のデータフレーム。
+        lower_col: 区間下限の列名（円）。
+        upper_col: 区間上限の列名（円）。
+
+    Returns:
+        ``width_median_yen`` / ``width_mean_yen`` をキーとする辞書。
+        対象行が無ければ各値 NaN。
+    """
+    nan = float("nan")
+    if len(df) == 0 or not {lower_col, upper_col}.issubset(df.columns):
+        return {"width_median_yen": nan, "width_mean_yen": nan}
+
+    width = (df[upper_col] - df[lower_col]).dropna().to_numpy(dtype=float)
+    if len(width) == 0:
+        return {"width_median_yen": nan, "width_mean_yen": nan}
+
+    return {
+        "width_median_yen": float(np.median(width)),
+        "width_mean_yen": float(np.mean(width)),
+    }
+
+
+# 帯別 PICP/PIAW
+def interval_metrics_by_price_band(
+    df: pd.DataFrame,
+    nominal: float = DEFAULT_NOMINAL_COVERAGE,
+) -> pd.DataFrame:
+    """価格帯別の PICP・PIAW・件数・名目との差分を算出する.
+
+    ``actual_price_band`` でグルーピングし、過少/過大カバレッジが
+    どの価格帯で生じているかを切り分けるための表を返す。
+
+    Args:
+        df: 予測結果のデータフレーム。
+        nominal: 名目カバレッジ（%）。``coverage_gap`` の基準にする。
+
+    Returns:
+        ``actual_price_band``・``count``・``picp``・``piaw_median_yen``・
+        ``coverage_gap`` を持つデータフレーム（価格帯は金額昇順）。
+        必要な列が無い場合は同じ列構成の空データフレーム。
+    """
+    columns = [PRICE_BAND_COL, "count", "picp", "piaw_median_yen", "coverage_gap"]
+    required = {PRICE_BAND_COL, ACTUAL_PRICE_COL, PRED_LOWER_COL, PRED_UPPER_COL}
+    if len(df) == 0 or not required.issubset(df.columns):
+        return pd.DataFrame(columns=columns)
+
+    work = df[[PRICE_BAND_COL, ACTUAL_PRICE_COL, PRED_LOWER_COL, PRED_UPPER_COL]].dropna()
+    if len(work) == 0:
+        return pd.DataFrame(columns=columns)
+
+    inside = (work[ACTUAL_PRICE_COL] >= work[PRED_LOWER_COL]) & (
+        work[ACTUAL_PRICE_COL] <= work[PRED_UPPER_COL]
+    )
+    width = work[PRED_UPPER_COL] - work[PRED_LOWER_COL]
+    work = work.assign(_inside=inside, _width=width)
+
+    result = (
+        work.groupby(PRICE_BAND_COL, observed=True)
+        .agg(
+            count=("_inside", "size"),
+            picp=("_inside", lambda s: float(s.mean() * 100)),
+            piaw_median_yen=("_width", "median"),
+        )
+        .reset_index()
+    )
+    result["coverage_gap"] = result["picp"] - nominal  # 負 = 過少カバレッジ
+
+    # 金額昇順に並べ替える（低額→高額で過少帯の所在を読みやすく）
+    order = price_band_order(df)
+    result[PRICE_BAND_COL] = pd.Categorical(result[PRICE_BAND_COL], categories=order, ordered=True)
+    result = result.sort_values(PRICE_BAND_COL).reset_index(drop=True)
+    result[PRICE_BAND_COL] = result[PRICE_BAND_COL].astype(str)
+    return result
+
+
+def flag_wide_intervals(
+    df: pd.DataFrame,
+    width_col: str = INTERVAL_WIDTH_COL,
+    reference_col: str = PRED_PRICE_COL,
+    threshold: float = 1.0,
+) -> pd.Series:
+    """区間幅が予測価格に対して過大な物件（分布外の疑い）を True にする.
+
+    相対区間幅 = ``width / reference`` がしきい値を超える行をフラグする。
+    高額物件ほど絶対幅が大きくて当然なため、予測価格で正規化して評価する。
+    必要な列が無い場合は全 False、参照価格が 0 以下の行は判定不能として False。
+
+    Args:
+        df: 予測結果のデータフレーム。
+        width_col: 区間幅の列名（円）。
+        reference_col: 正規化の基準にする予測価格の列名（円）。
+        threshold: 相対幅のしきい値（既定 1.0 = 区間幅が予測価格を超える）。
+
+    Returns:
+        ``df.index`` に揃った bool の Series（True = 分布外の疑い）。
+    """
+    if len(df) == 0 or not {width_col, reference_col}.issubset(df.columns):
+        return pd.Series(False, index=df.index, dtype=bool)
+
+    width = df[width_col].to_numpy(dtype=float)
+    reference = df[reference_col].to_numpy(dtype=float)
+
+    # 参照価格が正の行だけ相対幅を計算（0 以下・欠損は NaN → 後段で False）
+    with np.errstate(divide="ignore", invalid="ignore"):
+        relative = np.where(reference > 0, width / reference, np.nan)
+
+    # NaN > threshold は False になるため、判定不能行は自動的に非フラグ
+    flagged = relative > threshold
+    return pd.Series(flagged, index=df.index, dtype=bool)

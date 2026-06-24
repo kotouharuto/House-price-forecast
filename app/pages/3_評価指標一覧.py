@@ -4,6 +4,7 @@
 現行モデルの数値と業界 AVM 基準（NAVAR/IAAO）との比較を表示する。
 """
 
+import math
 import sys
 from pathlib import Path
 
@@ -16,6 +17,9 @@ if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
 from src.visualization.aggregate import (  # noqa: E402
+    DEFAULT_NOMINAL_COVERAGE,
+    coverage_rate,
+    interval_width_stats,
     load_predictions,
     metrics_by_price_band,
     percent_error_rates,
@@ -106,6 +110,30 @@ def _render_band_breakdown(df: pd.DataFrame) -> None:
         "自動評価で使える範囲と、人手査定が望ましい範囲を見極めやすくなる。"
     )
     st.dataframe(display, use_container_width=True, hide_index=True)
+
+
+def _render_interval_summary(df: pd.DataFrame) -> None:
+    """現行モデルの区間指標（PICP / PIAW）を表示する."""
+    picp = coverage_rate(df)
+    if math.isnan(picp):  # ※ ファイル先頭に import math を追加
+        return
+    widths = interval_width_stats(df)
+
+    st.subheader("予測区間の評価（最新の test 全件）")
+    rows = [
+        (
+            "PICP",
+            f"{picp:.2f}%",
+            f"実価格が予測区間に入る割合。目標(名目) {DEFAULT_NOMINAL_COVERAGE:.0f}%",
+        ),
+        ("PIAW(中央値)", format_yen_jp(widths["width_median_yen"]), "予測区間幅の中央値"),
+        ("PIAW(平均)", format_yen_jp(widths["width_mean_yen"]), "予測区間幅の平均"),
+    ]
+    st.dataframe(
+        pd.DataFrame(rows, columns=["指標", "値", "意味"]),
+        use_container_width=True,
+        hide_index=True,
+    )
 
 
 def _render_benchmark() -> None:
@@ -310,6 +338,39 @@ def _render_definitions() -> None:
             """
         )
 
+    with st.expander("PICP（予測区間カバレッジ率）— 区間の信頼度"):
+        st.markdown("**計算式**")
+        st.latex(
+            r"\text{PICP} = \frac{100}{n}\sum_{i=1}^{n}"
+            r" \mathbb{1}\bigl[\,l_i \le y_i \le u_i\,\bigr] \quad (\%)"
+        )
+        st.markdown(
+            r"""
+            ここで $l_i$ / $u_i$ は物件 $i$ の予測区間の下限・上限。
+
+            **計算手順**
+            1. 各物件で実価格 $y_i$ が区間 $[l_i, u_i]$ に入るか判定（両端含む）
+            2. 入った件数の割合を %（×100）で表示
+
+            **意味と読み方**
+            - 区間予測が「当たっている」割合。**名目カバレッジ（区間生成時のα、本モデルは90%）に近いほど較正が良い**。
+            - 名目を**下回る**＝区間が狭すぎ（モデル過信）、**上回る**＝区間が広すぎ（情報量が低い）。
+            """
+        )
+
+    with st.expander("PIAW（予測区間の幅）— 区間の鋭さ"):
+        st.markdown("**計算式**")
+        st.latex(
+            r"\text{PIAW} = \mathrm{median}\bigl(\{\,u_i - l_i\,\}_{i=1}^{n}\bigr) \quad (\text{円})"
+        )
+        st.markdown(
+            r"""
+            **意味と読み方**
+            - 予測区間の幅（上限−下限）の中央値。**狭いほど有用**だが、狭すぎると PICP が下がるトレードオフ。
+            - PICP とセットで見る: 「PICP が目標近辺を保ちつつ PIAW が小さい」が理想。
+            """
+        )
+
 
 def _render_usage_guide() -> None:
     """指標の使い分けに関するガイドを表示する."""
@@ -323,6 +384,8 @@ def _render_usage_guide() -> None:
             ["MAPE", "%", "%", "低", "相対精度の総合評価"],
             ["Median APE", "%", "%", "高", "典型物件の体感精度"],
             ["PE10/PE20", "%", "%", "高", "業界 AVM 基準・運用判断"],
+            ["PE10/PE20", "%", "%", "高", "業界 AVM 基準・運用判断"],
+            ["PICP / PIAW", "%・円", "%・円", "—", "予測区間の較正と鋭さの評価"],
         ],
         columns=["指標", "スケール", "単位", "外れ値への頑健性", "主な用途"],
     )
@@ -367,6 +430,11 @@ def main() -> None:
     _render_definitions()
     st.divider()
     _render_usage_guide()
+    _render_current_summary(df)
+    st.divider()
+    _render_interval_summary(df)  # 追加
+    st.divider()
+    _render_band_breakdown(df)
 
 
 main()
