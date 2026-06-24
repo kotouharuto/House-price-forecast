@@ -21,6 +21,7 @@ if str(_PROJECT_ROOT) not in sys.path:
 
 # プロジェクト内モジュール（sys.path 操作後である必要があるため E402 を許容）
 from app.filters import render_sidebar_filters  # noqa: E402
+from app.theme import ERROR_COLOR_SCALE  # noqa: E402
 from src.visualization.aggregate import (  # noqa: E402
     ACTUAL_PRICE_COL,
     AGE_COL,
@@ -51,8 +52,8 @@ from src.visualization.master import code_to_label, load_municipality_names  # n
 
 # 散布図の最大プロット点数（描画負荷を抑えるためサンプリングする）
 _MAX_SCATTER_POINTS = 4000
-# 誤差を表す連続カラースケール（低=青 → 高=赤）
-_ERROR_COLOR_SCALE = "RdYlBu_r"
+# 誤差を表す連続カラースケール（アプリ共通: app/theme.py で一元管理）
+_ERROR_COLOR_SCALE = ERROR_COLOR_SCALE
 
 st.set_page_config(page_title="BIダッシュボード", layout="wide")
 
