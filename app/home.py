@@ -4,10 +4,12 @@
 および各ページ（BIダッシュボード／地図／評価指標一覧）への導線を提供する。
 """
 
+import math
 import sys
 from pathlib import Path
 
 import pandas as pd
+import plotly.express as px
 import streamlit as st
 
 # プロジェクトルートを sys.path に追加（src.xxx / app.xxx を import するため）
@@ -16,13 +18,22 @@ if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
 from app.assets import download_assets  # noqa: E402
+from app.theme import BRAND_COLOR, ERROR_COLOR_SCALE, apply_chart_style  # noqa: E402
 from src.visualization.aggregate import (  # noqa: E402
+    DEFAULT_NOMINAL_COVERAGE,
+    PRICE_BAND_COL,
+    WARD_CODE_COL,
+    aggregate_by_ward,
+    coverage_rate,
+    interval_width_stats,
     load_predictions,
     metrics_by_price_band,
     percent_error_rates,
+    price_band_order,
     summarize_metrics,
 )
 from src.visualization.format import format_yen_jp  # noqa: E402
+from src.visualization.master import code_to_label, load_municipality_names  # noqa: E402
 
 st.set_page_config(
     page_title="東京都不動産価格予測 BIツール",
@@ -35,6 +46,12 @@ st.set_page_config(
 def _load() -> pd.DataFrame:
     """予測結果を読み込む（キャッシュ付き）."""
     return load_predictions()
+
+
+@st.cache_data
+def _municipality_names() -> dict[int, str]:
+    """市区町村コード→名称マスタを読み込む（キャッシュ付き）."""
+    return load_municipality_names()
 
 
 def _render_overview() -> None:
@@ -120,8 +137,8 @@ def _render_kpi_summary(df: pd.DataFrame) -> None:
     )
 
 
-def _render_band_summary(df: pd.DataFrame) -> None:
-    """価格帯別の Median APE / PE10 のサマリを表形式で表示する."""
+def _render_band_summary_table(df: pd.DataFrame) -> None:
+    """価格帯別の Median APE / PE10 のサマリを表形式で表示する（詳細用）."""
     band_df = metrics_by_price_band(df)
     if band_df.empty:
         return
@@ -140,12 +157,123 @@ def _render_band_summary(df: pd.DataFrame) -> None:
     for col in ("Median APE (%)", "MAPE (%)", "PE10 (%)", "PE20 (%)"):
         display[col] = display[col].round(2)
 
-    st.subheader("価格帯別の精度")
-    st.caption(
-        "価格帯ごとの誤差水準。Median APE が低く・PE10 が高いほど精度が良い。"
-        "両端（低額帯・高額帯）に難があるかを把握する用途。"
-    )
     st.dataframe(display, use_container_width=True, hide_index=True)
+
+
+def _render_accuracy_chart(df: pd.DataFrame) -> None:
+    """価格帯別の Median APE を横棒グラフで表示する（低いほど良い）."""
+    band = metrics_by_price_band(df)
+    if band.empty:
+        st.info("価格帯別の精度を計算できませんでした。")
+        return
+
+    order = price_band_order(df)
+    band[PRICE_BAND_COL] = pd.Categorical(band[PRICE_BAND_COL], categories=order, ordered=True)
+    band = band.sort_values(PRICE_BAND_COL)
+
+    fig = px.bar(
+        band,
+        x="median_ape",
+        y=PRICE_BAND_COL,
+        orientation="h",
+        color="median_ape",
+        color_continuous_scale=ERROR_COLOR_SCALE,
+        text=band["median_ape"].map(lambda v: f"{v:.1f}%"),
+        labels={"median_ape": "Median APE(%)", PRICE_BAND_COL: "価格帯"},
+    )
+    fig.update_layout(
+        yaxis={"categoryorder": "array", "categoryarray": order},
+        coloraxis_showscale=False,
+    )
+    apply_chart_style(fig)
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def _render_interval_gauge(df: pd.DataFrame) -> None:
+    """予測区間のカバレッジ（PICP）を目標90%ラインつきゲージで表示する."""
+    picp = coverage_rate(df)
+    if math.isnan(picp):
+        st.info("予測区間の列がありません。`predict_test` で再生成してください。")
+        return
+
+    widths = interval_width_stats(df)
+    gap = picp - DEFAULT_NOMINAL_COVERAGE
+    fill = "#1D9E75" if gap >= -2 else "#E0A030"
+    gap_color = "#0F6E56" if gap >= -2 else "#C0392B"
+    piaw = format_yen_jp(widths["width_median_yen"])
+
+    st.markdown(
+        f"""
+        <div style="border:1px solid #e6e9ef;border-radius:12px;padding:16px 18px;">
+          <div style="display:flex;align-items:baseline;gap:8px;">
+            <span style="font-size:30px;font-weight:600;">{picp:.1f}%</span>
+            <span style="font-size:13px;color:{gap_color};">{gap:+.1f}pt vs 目標</span>
+          </div>
+          <div style="position:relative;margin:14px 0 6px;height:16px;
+                      background:#eef0f2;border-radius:8px;">
+            <div style="position:absolute;left:0;top:0;bottom:0;width:{picp:.1f}%;
+                        background:{fill};border-radius:8px;"></div>
+            <div style="position:absolute;left:{DEFAULT_NOMINAL_COVERAGE:.0f}%;top:-4px;bottom:-4px;
+                        width:2px;background:#31333F;"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:#8b8f9a;">
+            <span>0%</span><span>目標 {DEFAULT_NOMINAL_COVERAGE:.0f}%</span><span>100%</span>
+          </div>
+          <div style="font-size:13px;color:#6b7280;margin-top:10px;">
+            区間幅中央値(PIAW): {piaw}
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _render_area_highlight(df: pd.DataFrame) -> None:
+    """平均予測価格の上位行政区を横棒グラフで表示する."""
+    ward = aggregate_by_ward(df)
+    if ward.empty or "pred_price_mean" not in ward.columns:
+        return
+
+    name_by_code = _municipality_names()
+    top = ward.sort_values("pred_price_mean", ascending=False).head(8).copy()
+    top["label"] = top[WARD_CODE_COL].map(lambda code: code_to_label(code, name_by_code))
+    top["_text"] = top["pred_price_mean"].map(format_yen_jp)
+
+    fig = px.bar(
+        top,
+        x="pred_price_mean",
+        y="label",
+        orientation="h",
+        text="_text",
+        labels={"pred_price_mean": "平均予測価格(円)", "label": "行政区"},
+    )
+    fig.update_traces(marker_color=BRAND_COLOR)
+    fig.update_layout(yaxis={"categoryorder": "total ascending"})
+    apply_chart_style(fig)
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def _render_analysis_summary(df: pd.DataFrame) -> None:
+    """分析・可視化のサマリ帯（精度・区間較正・エリア）を表示する."""
+    st.subheader("分析サマリ")
+    st.caption("ひと目で全体像を把握できるサマリ。詳細は各ページへ。")
+
+    col_acc, col_picp = st.columns(2)
+    with col_acc:
+        st.markdown("##### 価格帯別の精度（Median APE）")
+        _render_accuracy_chart(df)
+        st.caption("詳しくは『BIダッシュボード』")
+    with col_picp:
+        st.markdown("##### 予測区間の較正（PICP）")
+        _render_interval_gauge(df)
+        st.caption("詳しくは『評価指標一覧』")
+
+    st.markdown("##### エリアハイライト（平均予測価格 上位）")
+    _render_area_highlight(df)
+    st.caption("詳しくは『地図』")
+
+    with st.expander("価格帯別の詳細（表）"):
+        _render_band_summary_table(df)
 
 
 def _render_navigation() -> None:
@@ -206,7 +334,7 @@ def main() -> None:
 
     _render_kpi_summary(df)
     st.divider()
-    _render_band_summary(df)
+    _render_analysis_summary(df)
     st.divider()
     _render_navigation()
 
