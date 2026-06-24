@@ -5,6 +5,7 @@
 地図可視化は別ページ（後続フェーズ）で提供する。
 """
 
+import math
 import sys
 from pathlib import Path
 
@@ -25,13 +26,22 @@ from src.visualization.aggregate import (  # noqa: E402
     AGE_COL,
     APE_COL,
     AREA_COL,
+    DEFAULT_NOMINAL_COVERAGE,
     ERROR_YEN_COL,
+    INTERVAL_WIDTH_COL,
+    PRED_LOWER_COL,
     PRED_PRICE_COL,
+    PRED_UPPER_COL,
     PRICE_BAND_COL,
     STATION_COL,
+    TYPE_COL,
     WARD_CODE_COL,
     aggregate_by_station,
     aggregate_by_ward,
+    coverage_rate,
+    flag_wide_intervals,
+    interval_metrics_by_price_band,
+    interval_width_stats,
     load_predictions,
     summarize_metrics,
     worst_properties,
@@ -325,6 +335,128 @@ def _render_download_section(
         )
 
 
+def _has_interval_columns(df: pd.DataFrame) -> bool:
+    """予測区間の列（lower/upper）が揃っているか判定する."""
+    return {PRED_LOWER_COL, PRED_UPPER_COL}.issubset(df.columns)
+
+
+def _render_interval_kpis(df: pd.DataFrame) -> None:
+    """予測区間のKPI(PICP / PIAW)をカード表示する"""
+    st.subheader("予測区間の評価")
+    picp = coverage_rate(df)
+    widths = interval_width_stats(df)
+
+    cols = st.columns(3)
+    if math.isnan(picp):
+        cols[0].metric("区間内率(PICP)", "-")
+    else:
+        cols[0].metric(
+            "区間内率(PICP)",
+            f="{picp:.1f}%",
+            delta=f"{picp - DEFAULT_NOMINAL_COVERAGE:+.1f}pt vs 目標{DEFAULT_NOMINAL_COVERAGE:.0f}%",
+            help="実価格が予測区間に入る割合。目標(名目カバレッジ)に近いほど較正が良い",
+        )
+
+    cols[1].metric(
+        "区間幅 中央値(PIAW)",
+        format_yen_jp(widths["width_median_yen"]),
+        help="予測区間幅(上限−下限)の中央値。狭いほど有用だが狭すぎると PICP が下がる",
+    )
+    cols[2].metric("区間幅 平均", format_yen_jp(widths["width_mean_yen"]))
+
+
+def _render_interval_by_band(df: pd.DataFrame) -> None:
+    """価格帯別の PICP（棒＋目標線）と PIAW（表）を描画する."""
+    st.subheader("価格帯別カバレッジ")
+    band = interval_metrics_by_price_band(df)
+    if band.empty:
+        st.info("価格帯別の区間評価を計算できませんでした。")
+        return
+
+    fig = px.bar(
+        band,
+        x=PRICE_BAND_COL,
+        y="picp",
+        text=band["picp"].map(lambda v: f"{v:.0f}%"),
+        labels={PRICE_BAND_COL: "価格帯", "picp": "PICP(%)"},
+    )
+    fig.add_hline(
+        y=DEFAULT_NOMINAL_COVERAGE,
+        line_dash="dash",
+        line_color="gray",
+        annotation_text=f"目標 {DEFAULT_NOMINAL_COVERAGE:.0f}%",
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    show = band.copy()
+    show["piaw_median_yen"] = show["piaw_median_yen"].map(format_yen_jp)
+    show["picp"] = show["picp"].round(1)
+    show["coverage_gap"] = show["coverage_gap"].round(1)
+    show = show.rename(
+        columns={
+            PRICE_BAND_COL: "価格帯",
+            "count": "件数",
+            "picp": "PICP(%)",
+            "piaw_median_yen": "区間幅中央値",
+            "coverage_gap": "目標との差(pt)",
+        }
+    )
+    st.dataframe(show, use_container_width=True, hide_index=True)
+    st.caption("目標との差がマイナスの価格帯ほど区間が狭すぎる（モデル過信）傾向。")
+
+
+def _render_wide_intervals(df: pd.DataFrame) -> None:
+    """区間が極端に広い物件（分布外の疑い）を一覧表示する."""
+    st.subheader("分布外の疑い（区間が極端に広い物件）")
+    threshold = st.slider(
+        "相対区間幅のしきい値",
+        min_value=0.5,
+        max_value=3.0,
+        value=1.0,
+        step=0.1,
+        key="ood_threshold",
+        help="区間幅 ÷ 予測価格 がこの値を超える物件を抽出（1.0 = 区間幅が予測価格を超える）",
+    )
+    flag = flag_wide_intervals(df, threshold=threshold)
+    n = int(flag.sum())
+    st.caption(f"該当 {n:,} 件 / {len(df):,} 件")
+    if n == 0:
+        st.success("しきい値を超える物件はありません。")
+        return
+
+    wide = df[flag].copy()
+    wide["_relative"] = wide[INTERVAL_WIDTH_COL] / wide[PRED_PRICE_COL]
+    wide = wide.sort_values("_relative", ascending=False).head(100)
+
+    name_by_code = _municipality_names()
+    table = pd.DataFrame(
+        {
+            "行政区": wide[WARD_CODE_COL].map(lambda c: code_to_label(c, name_by_code)),
+            "種類": wide[TYPE_COL].astype(str),
+            "面積(㎡)": wide[AREA_COL],
+            "築年数": wide[AGE_COL],
+            "予測価格": wide[PRED_PRICE_COL].map(format_yen_jp),
+            "区間幅": wide[INTERVAL_WIDTH_COL].map(format_yen_jp),
+            "相対幅": wide["_relative"].map(lambda v: f"{v:.2f}倍"),
+        }
+    )
+    st.dataframe(table, use_container_width=True, hide_index=True)
+    st.caption("相対幅 = 区間幅 ÷ 予測価格。大きいほど学習データ分布外の可能性が高い。")
+
+
+def _render_interval_section(df: pd.DataFrame) -> None:
+    """予測区間タブの本体（列が無ければ案内を出す）."""
+    if not _has_interval_columns(df):
+        st.info(
+            "このデータには予測区間の列がありません。"
+            "`uv run python -m src.modeling.predict_test` で再生成してください。"
+        )
+        return
+    _render_interval_kpis(df)
+    _render_interval_by_band(df)
+    _render_wide_intervals(df)
+
+
 def main() -> None:
     """ページのエントリポイント."""
     st.title("予測結果 BIダッシュボード")
@@ -342,13 +474,15 @@ def main() -> None:
         filtered, _aggregate_ward_cached(filtered), _aggregate_station_cached(filtered)
     )
 
-    tab_accuracy, tab_area, tab_feature, tab_worst = st.tabs(
-        ["予測精度", "エリア別", "特徴量", "ワースト物件"]
+    tab_accuracy, tab_interval, tab_area, tab_feature, tab_worst = st.tabs(
+        ["予測精度", "予測区間", "エリア別", "特徴量", "ワースト物件"]
     )
     with tab_accuracy:
         _render_scatter(filtered)
         _render_error_distribution(filtered)
         _render_price_band(filtered)
+    with tab_interval:
+        _render_interval_section(filtered)
     with tab_area:
         _render_ranking(filtered, by_station=False)
         _render_ranking(filtered, by_station=True)
