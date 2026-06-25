@@ -353,7 +353,7 @@ def _render_interval_kpis(df: pd.DataFrame) -> None:
     else:
         cols[0].metric(
             "区間内率(PICP)",
-            f="{picp:.1f}%",
+            f"{picp:.1f}%",
             delta=f"{picp - DEFAULT_NOMINAL_COVERAGE:+.1f}pt vs 目標{DEFAULT_NOMINAL_COVERAGE:.0f}%",
             help="実価格が予測区間に入る割合。目標(名目カバレッジ)に近いほど較正が良い",
         )
